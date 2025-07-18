@@ -3,12 +3,13 @@ Copy a file
 Usage: app copy [options] <source> [destination] [...more-destinations]
 
 Positional parameters:
-  <source> - The source file
-  [destination] - The destination file
+  <source>               The source file
+  [destination]          The destination file
+  [...more-destinations] The destination files
 
 Options:
-      --dry-run - Dry run
-  -f, --force - Force overwrite
-  -h, --help - Show help
-  -r, --recursive - Copy recursively
+  -h, --help      Show help
+  -f, --force     Force overwrite
+  -r, --recursive Copy recursively
+      --dry-run   Dry run
 

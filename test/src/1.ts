@@ -99,9 +99,9 @@ const echo = command({
 const app = commandGroup<AppContext>({
   description: "Sample app",
 })
+  .command("echo", echo)
   .command("copy", copy)
   .command("cp", copy)
-  .command("echo", echo)
   .option("v", "version", "Show version", "boolean")
   .option("h", "help", "Show help", "boolean")
   .option("C", "cwd", "change directory", "scalar")

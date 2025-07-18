@@ -80,6 +80,10 @@ class Command<
     private readonly extraPositional: [ExtraPositional] extends [never]
       ? undefined
       : ExtraPositionalData<ExtraPositional>,
+    private readonly helpPositional: [left: string, right: string][],
+    private readonly helpPositionalLongestLeftLength: number,
+    private readonly helpOptions: [left: string, right: string][],
+    private readonly helpOptionsLongestLeftLength: number,
     private readonly parseOptions: {
       allowOptionAfterPositional?: boolean;
       allowDuplicateOptions?: boolean;
@@ -94,7 +98,19 @@ class Command<
     description: string;
     allowOptionAfterPositional?: boolean;
   }): Command<0, [], {}, {}, never> {
-    return new Command(description, 0, [], {}, {}, undefined, options);
+    return new Command(
+      description,
+      0,
+      [],
+      {},
+      {},
+      undefined,
+      [],
+      0,
+      [],
+      0,
+      options
+    );
   }
 
   public positional(
@@ -207,6 +223,13 @@ class Command<
       this.optionsData,
       this.shortOptions,
       this.extraPositional,
+      [
+        ...this.helpPositional,
+        [required ? `<${name}>` : `[${name}]`, description],
+      ],
+      Math.max(this.helpPositionalLongestLeftLength, name.length + 2),
+      this.helpOptions,
+      this.helpOptionsLongestLeftLength,
       this.parseOptions
     );
   }
@@ -432,6 +455,21 @@ class Command<
       },
       short ? { ...this.shortOptions, [short]: long } : this.shortOptions,
       this.extraPositional,
+      this.helpPositional,
+      this.helpPositionalLongestLeftLength,
+      [
+        ...this.helpOptions,
+        [
+          `${short ? `-${short},` : "   "} --${long}${
+            type === "boolean" ? "" : " <value>"
+          }`,
+          description,
+        ],
+      ],
+      Math.max(
+        this.helpOptionsLongestLeftLength,
+        long.length + 6 + (type === "boolean" ? 0 : 8)
+      ),
       this.parseOptions
     );
   }
@@ -472,6 +510,10 @@ class Command<
       this.optionsData,
       this.shortOptions,
       { parse: parse ?? ((value) => value), name, description },
+      [...this.helpPositional, [`[...${name}]`, description]],
+      Math.max(this.helpPositionalLongestLeftLength, name.length + 5),
+      this.helpOptions,
+      this.helpOptionsLongestLeftLength,
       this.parseOptions
     );
   }
@@ -502,31 +544,27 @@ class Command<
           self.extraPositional ? ` [...${self.extraPositional.name}]` : ""
         }\n`
       );
-      if (self.positionalData.length > 0) {
-        console.log(
-          `Positional parameters:\n${self.positionalData
-            .map(
-              ({ name, description }, i) =>
-                `  ${i < self.requiredPositionalCount ? "<" : "["}${name}${
-                  i < self.requiredPositionalCount ? ">" : "]"
-                } - ${description}`
-            )
-            .join("\n")}\n`
+      if (self.helpPositional.length > 0) {
+        console.log("Positional parameters:");
+        self.helpPositional.forEach(([left, right]) =>
+          console.log(
+            `  ${left}${" ".repeat(
+              self.helpPositionalLongestLeftLength - left.length + 1
+            )}${right}`
+          )
         );
       }
+      console.log("");
       if (Object.keys(self.optionsData).length > 0) {
-        console.log(
-          `Options:\n${Object.entries(
-            self.optionsData as Record<string, OptionData>
+        console.log("Options:");
+        self.helpOptions.forEach(([left, right]) =>
+          console.log(
+            `  ${left}${" ".repeat(
+              self.helpOptionsLongestLeftLength - left.length + 1
+            )}${right}`
           )
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([long, { type, description, short }]) => {
-              return `  ${short ? `-${short}, ` : "    "}--${long}${
-                type.type === "boolean" ? "" : ` <value>`
-              } - ${description}`;
-            })
-            .join("\n")}\n`
         );
+        console.log("");
       }
     }
 
@@ -798,6 +836,10 @@ class CommandGroup<
     >,
     private readonly optionsData: Partial<Record<string, OptionData>>,
     private readonly shortOptions: ShortOptions,
+    private readonly helpSubcommands: [left: string, right: string][],
+    private readonly helpSubcommandsLongestLeftLength: number,
+    private readonly helpOptions: [left: string, right: string][],
+    private readonly helpOptionsLongestLeftLength: number,
     private readonly parseOptions: {
       allowDuplicateOptions?: boolean;
       allowSingleDashAsPositional?: boolean;
@@ -811,7 +853,7 @@ class CommandGroup<
     description: string;
     allowDuplicateOptions?: boolean;
   }): CommandGroup<{}, {}, {}, InnerContext, T> {
-    return new CommandGroup(description, {}, {}, {}, options);
+    return new CommandGroup(description, {}, {}, {}, [], 0, [], 0, options);
   }
 
   public command<const Name extends string, T2>(
@@ -846,6 +888,10 @@ class CommandGroup<
       },
       this.optionsData,
       this.shortOptions,
+      [...this.helpSubcommands, [name, command.description]],
+      Math.max(this.helpSubcommandsLongestLeftLength, name.length),
+      this.helpOptions,
+      this.helpOptionsLongestLeftLength,
       this.parseOptions
     );
   }
@@ -1069,6 +1115,21 @@ class CommandGroup<
         },
       },
       short ? { ...this.shortOptions, [short]: long } : this.shortOptions,
+      this.helpSubcommands,
+      this.helpSubcommandsLongestLeftLength,
+      [
+        ...this.helpOptions,
+        [
+          `${short ? `-${short},` : "   "} --${long}${
+            type === "boolean" ? "" : " <value>"
+          }`,
+          description,
+        ],
+      ],
+      Math.max(
+        this.helpOptionsLongestLeftLength,
+        long.length + 6 + (type === "boolean" ? 0 : 8)
+      ),
       this.parseOptions
     );
   }
@@ -1086,30 +1147,25 @@ class CommandGroup<
       console.log(
         `Usage: ${fullName} [options] <subcommand> [subcommand options] [...subcommand arguments]\n`
       );
-      console.log(
-        `Subcommands:\n${Object.entries(
-          self.commands as Record<
-            string,
-            CommandRegistration<InnerContext, Result>
-          >
-        )
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([name, { description }]) => `  ${name} - ${description}`)
-          .join("\n")}\n`
-      );
-      if (Object.keys(self.optionsData).length > 0) {
+      console.log("Subcommands:");
+      self.helpSubcommands.forEach(([left, right]) =>
         console.log(
-          `Options:\n${Object.entries(
-            self.optionsData as Record<string, OptionData>
+          `  ${left}${" ".repeat(
+            self.helpSubcommandsLongestLeftLength - left.length + 1
+          )}${right}`
+        )
+      );
+      console.log("");
+      if (Object.keys(self.optionsData).length > 0) {
+        console.log("Options:");
+        self.helpOptions.forEach(([left, right]) =>
+          console.log(
+            `  ${left}${" ".repeat(
+              self.helpOptionsLongestLeftLength - left.length + 1
+            )}${right}`
           )
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([long, { type, description, short }]) => {
-              return `  ${short ? `-${short}, ` : "    "}--${long}${
-                type.type === "boolean" ? "" : ` <value>`
-              } - ${description}`;
-            })
-            .join("\n")}\n`
         );
+        console.log("");
       }
     }
 
