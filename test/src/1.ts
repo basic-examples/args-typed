@@ -16,10 +16,11 @@ const copy = command({
   .option("h", "help", "Show help", "boolean")
   .option("f", "force", "Force overwrite", "boolean")
   .option("r", "recursive", "Copy recursively", "boolean")
+  .option(undefined, "dry-run", "Dry run", "boolean")
   .build<AppContext, number>(
     (
       [source, destination],
-      { help, force, recursive },
+      { help, force, recursive, "dry-run": dryRun },
       { fullName, printDescription }
     ) => {
       if (help) {
@@ -33,6 +34,10 @@ const copy = command({
             : ""
         }`
       );
+      if (!dryRun) {
+        console.log("without dry-run is not implemented");
+        process.exit(0);
+      }
       return 42;
     }
   );
@@ -54,6 +59,7 @@ const echo = command({
   .option("C", "cwd", "cwd list for expansion for -e", "list")
   .option("d", "dummy", "Dummy option", "boolean")
   .option("b", "bool", "Dummy boolean option", "boolean")
+  .option("j", "join-with", "Join with", "scalar")
   .build<AppContext, number>(
     (
       [...messages],
@@ -66,27 +72,26 @@ const echo = command({
         cwd,
         dummy,
         bool,
+        "join-with": j,
       },
       { fullName, printDescription }
     ) => {
       if (help) {
         printDescription(fullName);
         process.exit(0);
-      }
-      if (escape && E) {
+      } else if (escape && E) {
         console.error("Cannot use both -e and -E");
         process.exit(1);
-      }
-      if (escape || n) {
+      } else if (escape || n) {
         console.error("-e and -n are not implemented");
         process.exit(1);
-      }
-      if (dump) {
-        console.log({ messages, n, escape, E, dump, cwd, dummy, bool });
+      } else if (dump) {
+        console.log({ messages, n, escape, E, dump, cwd, dummy, bool, j });
         process.exit(0);
+      } else {
+        console.log(messages.join(j ?? " "));
+        return 0;
       }
-      console.log(messages.join(" "));
-      return 0;
     }
   );
 
