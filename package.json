@@ -3,7 +3,8 @@
   "name": "args-typed",
   "version": "0.0.1",
   "scripts": {
-    "build": "rimraf dist && tsc && cpy README.md dist && package-json-minifier"
+    "build": "rimraf dist && tsc && cpy README.md dist && package-json-minifier",
+    "test": "node --test --import tsx tests/*.ts"
   },
   "devDependencies": {
     "cpy-cli": "^5.0.0",
