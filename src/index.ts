@@ -65,7 +65,7 @@ class Command<
   const Positional extends unknown[],
   const LongOptions extends Partial<Record<string, OptionType>>,
   const ShortOptions extends Partial<Record<string, string>>,
-  const ExtraPositional extends unknown
+  const ExtraPositional
 > {
   private constructor(
     private readonly description: string,
@@ -484,7 +484,10 @@ class Command<
 
   public build<Context, T>(
     action: (
-      positional: Positional,
+      positional: [
+        ...Positional,
+        ...([ExtraPositional] extends [never] ? [] : ExtraPositional[])
+      ],
       options: Options<LongOptions>,
       context: CommandContext<Context, T>
     ) => T

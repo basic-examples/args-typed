@@ -90,27 +90,12 @@ const echo = command({
     }
   );
 
-const nested = commandGroup<AppContext>({
-  description: "Nested command group",
-})
-  .command("echo", echo)
-  .command("cp", copy)
-  .command("copy", copy)
-  .build<AppContext>((_, { context }) => context);
-
-const nested2 = commandGroup<AppContext>({
-  description: "Nested command group 2",
-})
-  .command("nested", nested)
-  .build<AppContext>((_, { context }) => context);
-
 const app = commandGroup<AppContext>({
   description: "Sample app",
 })
   .command("copy", copy)
   .command("cp", copy)
   .command("echo", echo)
-  .command("n", nested2)
   .option("v", "version", "Show version", "boolean")
   .option("h", "help", "Show help", "boolean")
   .option("C", "cwd", "change directory", "scalar")
@@ -129,8 +114,4 @@ const app = commandGroup<AppContext>({
     }
   );
 
-const givenArgs = process.argv.slice(2);
-const sampleArgs = ["-C", "my_cwd", "copy", "-h", "a", "b"];
-const args = givenArgs.length > 0 ? givenArgs : sampleArgs;
-
-run(app, args, { ft: 42 }, "app");
+run(app, process.argv.slice(2), { ft: 42 }, "app");

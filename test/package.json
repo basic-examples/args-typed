@@ -3,7 +3,8 @@
   "name": "@this-project/sample",
   "scripts": {
     "build": "cd .. && npm run build",
-    "test": "npm run build && npm install && tsx src"
+    "prestart": "npm run build && npm install",
+    "start": "bash test.bash"
   },
   "devDependencies": {
     "@types/node": "^24.0.14",

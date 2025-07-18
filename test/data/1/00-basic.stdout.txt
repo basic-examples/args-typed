@@ -1,0 +1,13 @@
+Copy a file
+
+Usage: app copy [options] <source> <destination>
+
+Positional parameters:
+  <source> - The source file
+  <destination> - The destination file
+
+Options:
+  -f, --force Force overwrite
+  -h, --help Show help
+  -r, --recursive Copy recursively
+
