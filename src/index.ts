@@ -83,6 +83,7 @@ class Command<
     private readonly parseOptions: {
       allowOptionAfterPositional?: boolean;
       allowDuplicateOptions?: boolean;
+      allowSingleDashAsPositional?: boolean;
     }
   ) {}
 
@@ -535,8 +536,11 @@ class Command<
       name: string,
       fullName: string
     ): T {
-      const { allowOptionAfterPositional, allowDuplicateOptions } =
-        self.parseOptions;
+      const {
+        allowOptionAfterPositional,
+        allowDuplicateOptions,
+        allowSingleDashAsPositional,
+      } = self.parseOptions;
       const positional: any[] = [];
       const options: any = {};
       const extra: any[] = [];
@@ -564,11 +568,30 @@ class Command<
           }
           continue;
         } else if (current === "-") {
-          throw new ParseError(
-            "[args-typed] single dash '-' is invalid unless after `--`.",
-            printDescription,
-            fullName
-          );
+          if (!allowSingleDashAsPositional) {
+            throw new ParseError(
+              "[args-typed] single dash '-' is invalid unless after `--`.",
+              printDescription,
+              fullName
+            );
+          }
+          // TODO: reduce code duplication
+          if (!allowOptionAfterPositional) {
+            parsingFlag = false;
+          }
+          if (posIndex < self.positionalData.length) {
+            positional.push(self.positionalData[posIndex].parse(current));
+            posIndex++;
+          } else {
+            if (!self.extraPositional) {
+              throw new ParseError(
+                "[args-typed] extra positional argument given",
+                printDescription,
+                fullName
+              );
+            }
+            extra.push(self.extraPositional.parse(current));
+          }
         } else if (current.startsWith("--")) {
           const eqIndex = current.indexOf("=");
           let longFlag = "";
@@ -777,6 +800,7 @@ class CommandGroup<
     private readonly shortOptions: ShortOptions,
     private readonly parseOptions: {
       allowDuplicateOptions?: boolean;
+      allowSingleDashAsPositional?: boolean;
     }
   ) {}
 
@@ -1095,7 +1119,8 @@ class CommandGroup<
       name: string,
       fullName: string
     ): Result {
-      const { allowDuplicateOptions } = self.parseOptions;
+      const { allowDuplicateOptions, allowSingleDashAsPositional } =
+        self.parseOptions;
       const options: any = {};
       let command: string | undefined;
       let i = 0;
@@ -1115,11 +1140,16 @@ class CommandGroup<
           i++;
           break;
         } else if (current == "-") {
-          throw new ParseError(
-            "[args-typed] single dash '-' is invalid unless after `--`.",
-            printDescription,
-            fullName
-          );
+          if (!allowSingleDashAsPositional) {
+            throw new ParseError(
+              "[args-typed] single dash '-' is invalid unless after `--`.",
+              printDescription,
+              fullName
+            );
+          }
+          command = current;
+          i++;
+          break;
         } else if (current.startsWith("--")) {
           const eqIndex = current.indexOf("=");
           let longFlag = "";
