@@ -518,7 +518,7 @@ class Command<
     );
   }
 
-  public build<Context, T>(
+  public build<Context, T = void>(
     action: (
       positional: [
         ...Positional,
@@ -861,23 +861,29 @@ class CommandGroup<
     command: CommandRegistration<InnerContext, T2>
   ): CommandGroup<
     Commands & Record<Name, never>,
-    {},
-    {},
+    LongOptions,
+    ShortOptions,
     InnerContext,
     Result | T2
   >;
   public command<const Name extends string>(
     name: Name,
     command: CommandRegistration<InnerContext, Result>
-  ): CommandGroup<Commands & Record<Name, never>, {}, {}, InnerContext, Result>;
+  ): CommandGroup<
+    Commands & Record<Name, never>,
+    LongOptions,
+    ShortOptions,
+    InnerContext,
+    Result
+  >;
   public command<const Name extends string, T2>(
     name: Name,
     command: CommandRegistration<InnerContext, T2>
   ) {
     return new CommandGroup<
       Commands & Record<Name, never>,
-      {},
-      {},
+      LongOptions,
+      ShortOptions,
       InnerContext,
       Result | T2
     >(
