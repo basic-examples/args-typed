@@ -40,12 +40,12 @@ for input_file in data/*/*.in.txt; do
     EXIT_CODE=1
   fi
 
-  if ! diff -q "$output_stdout" <([[ -f "$stdout_file" ]] && cat "$stdout_file" || printf "") >/dev/null; then
+  if ! diff "$output_stdout" <([[ -f "$stdout_file" ]] && cat "$stdout_file" || printf ""); then
     echo "Stdout mismatch in $input_file"
     EXIT_CODE=1
   fi
 
-  if ! diff -q "$output_stderr" <([[ -f "$stderr_file" ]] && cat "$stderr_file" || printf "") >/dev/null; then
+  if ! diff "$output_stderr" <([[ -f "$stderr_file" ]] && cat "$stderr_file" || printf ""); then
     echo "Stderr mismatch in $input_file"
     EXIT_CODE=1
   fi

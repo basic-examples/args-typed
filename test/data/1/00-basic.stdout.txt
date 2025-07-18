@@ -1,10 +1,10 @@
 Copy a file
 
-Usage: app copy [options] <source> <destination>
+Usage: app copy [options] <source> [destination] [...more-destinations]
 
 Positional parameters:
   <source> - The source file
-  <destination> - The destination file
+  [destination] - The destination file
 
 Options:
       --dry-run Dry run

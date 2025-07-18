@@ -12,7 +12,8 @@ const copy = command({
   description: "Copy a file",
 })
   .positional("source", "The source file")
-  .positional("destination", "The destination file")
+  .positional("destination", "The destination file", undefined, false)
+  .extra("more-destinations", "The destination files")
   .option("h", "help", "Show help", "boolean")
   .option("f", "force", "Force overwrite", "boolean")
   .option("r", "recursive", "Copy recursively", "boolean")
@@ -36,7 +37,7 @@ const copy = command({
       );
       if (!dryRun) {
         console.log("without dry-run is not implemented");
-        process.exit(0);
+        process.exit(1);
       }
       return 42;
     }

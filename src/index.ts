@@ -120,8 +120,8 @@ class Command<
   public positional(
     name: string,
     description: string,
-    parse: undefined,
-    required: true
+    parse?: (value: string) => string,
+    required?: true
   ): RequiredPositionalCount extends Positional["length"]
     ? Command<
         [...Positional, string]["length"],
@@ -135,11 +135,25 @@ class Command<
     name: string,
     description: string,
     parse: (value: string) => T,
-    required: true
+    required?: true
   ): RequiredPositionalCount extends Positional["length"]
     ? Command<
         [...Positional, T]["length"],
         [...Positional, T],
+        LongOptions,
+        ShortOptions,
+        ExtraPositional
+      >
+    : never;
+  public positional(
+    name: string,
+    description: string,
+    parse?: ((value: string) => string) | undefined,
+    required?: false
+  ): RequiredPositionalCount extends Positional["length"]
+    ? Command<
+        RequiredPositionalCount,
+        [...Positional, string],
         LongOptions,
         ShortOptions,
         ExtraPositional
@@ -150,7 +164,7 @@ class Command<
     description: string,
     parse: (value: string) => T,
     required: false
-  ): [ExtraPositional] extends [never]
+  ): RequiredPositionalCount extends Positional["length"]
     ? Command<
         RequiredPositionalCount,
         [...Positional, T],
@@ -424,38 +438,22 @@ class Command<
   public extra(
     name: string,
     description: string
-  ): Or<
-    [
-      ExtraPositional extends never ? false : true,
-      RequiredPositionalCount extends Positional["length"] ? false : true
-    ]
-  > extends true
-    ? never
-    : Command<
+  ): [ExtraPositional] extends [never]
+    ? Command<
         RequiredPositionalCount,
         Positional,
         LongOptions,
         ShortOptions,
         string
-      >;
+      >
+    : never;
   public extra<T>(
     name: string,
     description: string,
     parse: (value: string) => T
-  ): Or<
-    [
-      ExtraPositional extends never ? false : true,
-      RequiredPositionalCount extends Positional["length"] ? false : true
-    ]
-  > extends true
-    ? never
-    : Command<
-        RequiredPositionalCount,
-        Positional,
-        LongOptions,
-        ShortOptions,
-        T
-      >;
+  ): [ExtraPositional] extends [never]
+    ? Command<RequiredPositionalCount, Positional, LongOptions, ShortOptions, T>
+    : never;
   public extra(
     name: string,
     description: string,
@@ -464,11 +462,6 @@ class Command<
     if (this.extraPositional) {
       throw new ParseError(
         `[args-typed] extra positional parameters already registered`
-      );
-    }
-    if (this.positionalData.length !== this.requiredPositionalCount) {
-      throw new ParseError(
-        `[args-typed] extra positional parameters cannot be used with required positional parameters`
       );
     }
     return new Command(
@@ -502,11 +495,11 @@ class Command<
             ({ name }, i) =>
               ` ${i < self.requiredPositionalCount ? "<" : "["}${name}${
                 i < self.requiredPositionalCount ? ">" : "]"
-              }${
-                self.extraPositional ? ` [...${self.extraPositional.name}]` : ""
               }`
           )
-          .join("")}\n`
+          .join("")}${
+          self.extraPositional ? ` [...${self.extraPositional.name}]` : ""
+        }\n`
       );
       if (self.positionalData.length > 0) {
         console.log(
