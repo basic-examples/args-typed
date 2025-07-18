@@ -1,0 +1,14 @@
+Copy a file
+
+Usage: app copy [options] <source> [destination] [...more-destinations]
+
+Positional parameters:
+  <source> - The source file
+  [destination] - The destination file
+
+Options:
+      --dry-run Dry run
+  -f, --force Force overwrite
+  -h, --help Show help
+  -r, --recursive Copy recursively
+

@@ -1,4 +1,1 @@
--C
-my_cwd
-copy
--h
+--help

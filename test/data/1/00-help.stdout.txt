@@ -1,14 +1,14 @@
-Copy a file
+Sample app
 
-Usage: app copy [options] <source> [destination] [...more-destinations]
+Usage: app [options] <subcommand> [subcommand options] [...subcommand arguments]
 
-Positional parameters:
-  <source> - The source file
-  [destination] - The destination file
+Subcommands:
+  copy - Copy a file
+  cp - Copy a file
+  echo - Shell echo replacement
 
 Options:
-      --dry-run Dry run
-  -f, --force Force overwrite
+  -C, --cwd <value> change directory
   -h, --help Show help
-  -r, --recursive Copy recursively
+  -v, --version Show version
 
