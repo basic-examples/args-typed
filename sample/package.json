@@ -1,0 +1,14 @@
+{
+  "private": true,
+  "name": "@this-project/sample",
+  "scripts": {
+    "build": "cd .. && npm run build",
+    "test": "npm run build && npm install && tsx src"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.14",
+    "args-typed": "file:../dist",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}

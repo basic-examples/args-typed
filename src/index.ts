@@ -25,9 +25,9 @@ type Options<T extends Partial<Record<string, OptionType>>> = {
   [K in keyof T]: T[K] extends { type: "boolean" }
     ? true | undefined
     : T[K] extends { type: "scalar" }
-    ? ReturnType<T[K]["parse"]>
+    ? ReturnType<T[K]["parse"]> | undefined
     : T[K] extends { type: "list" }
-    ? ReturnType<T[K]["parse"]>[]
+    ? ReturnType<T[K]["parse"]>[] | undefined
     : never;
 };
 
@@ -36,16 +36,23 @@ export interface CommandContext<Context, T> {
   fullName: string;
   args: string[];
   context: Context;
+  printDescription: (fullName: string) => void;
   self: (args: string[], context: Context, name: string, fullName: string) => T;
-  help: (name: string, fullName: string) => void;
 }
 
-type CommandRegistration<Context, T> = (
-  args: string[],
-  context: Context,
-  name: string,
-  fullName: string
-) => T;
+export interface CommandGroupContext<Context, T> {
+  name: string;
+  fullName: string;
+  args: string[];
+  context: Context;
+  printDescription: (fullName: string) => void;
+  self: (args: string[], context: Context, name: string, fullName: string) => T;
+}
+
+interface CommandRegistration<Context, T> {
+  description: string;
+  run: (args: string[], context: Context, name: string, fullName: string) => T;
+}
 
 export class ParseError extends Error {
   constructor(message: string) {
@@ -53,7 +60,7 @@ export class ParseError extends Error {
   }
 }
 
-export class Command<
+class Command<
   const RequiredPositionalCount extends number,
   const Positional extends unknown[],
   const LongOptions extends Partial<Record<string, OptionType>>,
@@ -61,7 +68,6 @@ export class Command<
   const ExtraPositional extends unknown
 > {
   private constructor(
-    private readonly version: string | undefined,
     private readonly description: string,
     private readonly requiredPositionalCount: RequiredPositionalCount,
     private readonly positionalData: PositionalData[],
@@ -77,17 +83,27 @@ export class Command<
   ) {}
 
   public static command({
-    version,
     description,
     ...options
   }: {
-    version?: string;
     description: string;
     allowOptionAfterPositional?: boolean;
   }): Command<0, [], {}, {}, never> {
-    return new Command(version, description, 0, [], {}, {}, undefined, options);
+    return new Command(description, 0, [], {}, {}, undefined, options);
   }
 
+  public positional(
+    name: string,
+    description: string
+  ): RequiredPositionalCount extends Positional["length"]
+    ? Command<
+        [...Positional, string]["length"],
+        [...Positional, string],
+        LongOptions,
+        ShortOptions,
+        ExtraPositional
+      >
+    : never;
   public positional<T>(
     name: string,
     description: string,
@@ -96,6 +112,20 @@ export class Command<
     ? Command<
         [...Positional, T]["length"],
         [...Positional, T],
+        LongOptions,
+        ShortOptions,
+        ExtraPositional
+      >
+    : never;
+  public positional(
+    name: string,
+    description: string,
+    parse: undefined,
+    required: true
+  ): RequiredPositionalCount extends Positional["length"]
+    ? Command<
+        [...Positional, string]["length"],
+        [...Positional, string],
         LongOptions,
         ShortOptions,
         ExtraPositional
@@ -132,7 +162,7 @@ export class Command<
   public positional(
     name: string,
     description: string,
-    parse: (value: string) => unknown,
+    parse?: (value: string) => unknown,
     required = true
   ): unknown {
     if (required) {
@@ -148,8 +178,10 @@ export class Command<
         );
       }
     }
+    if (!parse) {
+      parse = (value) => value;
+    }
     return new Command(
-      this.version,
       this.description,
       this.requiredPositionalCount + (required ? 1 : 0),
       [...this.positionalData, { name, description, parse }],
@@ -160,7 +192,7 @@ export class Command<
     );
   }
 
-  public option<const NewLong extends string, T>(
+  public option<const NewLong extends string>(
     short: undefined,
     long: NewLong,
     description: string,
@@ -168,8 +200,7 @@ export class Command<
   ): Or<
     [
       UnionToIntersection<NewLong> extends never ? true : false,
-      "" extends NewLong ? true : false,
-      NewLong extends FirstLetter<NewLong> ? false : true,
+      NewLong extends "" ? true : false,
       ToLetters<NewLong> extends LongAllowed ? false : true,
       NewLong extends keyof LongOptions ? true : false
     ]
@@ -179,6 +210,32 @@ export class Command<
         RequiredPositionalCount,
         Positional,
         LongOptions & Record<NewLong, { type: "boolean" }>,
+        ShortOptions,
+        ExtraPositional
+      >;
+  public option<
+    const NewLong extends string,
+    const Type extends Exclude<OptionType["type"], "boolean">
+  >(
+    short: undefined,
+    long: NewLong,
+    description: string,
+    type: Type
+  ): Or<
+    [
+      UnionToIntersection<NewLong> extends never ? true : false,
+      UnionToIntersection<Type> extends never ? true : false,
+      NewLong extends "" ? true : false,
+      ToLetters<NewLong> extends LongAllowed ? false : true,
+      NewLong extends keyof LongOptions ? true : false
+    ]
+  > extends true
+    ? never
+    : Command<
+        RequiredPositionalCount,
+        Positional,
+        LongOptions &
+          Record<NewLong, { type: Type; parse: (value: string) => string }>,
         ShortOptions,
         ExtraPositional
       >;
@@ -196,8 +253,7 @@ export class Command<
     [
       UnionToIntersection<NewLong> extends never ? true : false,
       UnionToIntersection<Type> extends never ? true : false,
-      "" extends NewLong ? true : false,
-      NewLong extends FirstLetter<NewLong> ? false : true,
+      NewLong extends "" ? true : false,
       ToLetters<NewLong> extends LongAllowed ? false : true,
       NewLong extends keyof LongOptions ? true : false
     ]
@@ -212,9 +268,8 @@ export class Command<
         ExtraPositional
       >;
   public option<
-    const NewShort extends ShortAllowed,
-    const NewLong extends string,
-    T
+    const NewShort extends Exclude<ShortAllowed, keyof ShortOptions>,
+    const NewLong extends string
   >(
     short: NewShort,
     long: NewLong,
@@ -224,8 +279,7 @@ export class Command<
     [
       UnionToIntersection<NewShort> extends never ? true : false,
       UnionToIntersection<NewLong> extends never ? true : false,
-      "" extends NewLong ? true : false,
-      NewLong extends FirstLetter<NewLong> ? false : true,
+      NewLong extends "" ? true : false,
       ToLetters<NewLong> extends LongAllowed ? false : true,
       NewShort extends keyof ShortOptions ? true : false,
       NewLong extends keyof LongOptions ? true : false
@@ -240,7 +294,36 @@ export class Command<
         ExtraPositional
       >;
   public option<
-    const NewShort extends ShortAllowed,
+    const NewShort extends Exclude<ShortAllowed, keyof ShortOptions>,
+    const NewLong extends string,
+    const Type extends Exclude<OptionType["type"], "boolean">
+  >(
+    short: NewShort,
+    long: NewLong,
+    description: string,
+    type: Type
+  ): Or<
+    [
+      UnionToIntersection<NewShort> extends never ? true : false,
+      UnionToIntersection<NewLong> extends never ? true : false,
+      UnionToIntersection<Type> extends never ? true : false,
+      NewLong extends "" ? true : false,
+      ToLetters<NewLong> extends LongAllowed ? false : true,
+      NewShort extends keyof ShortOptions ? true : false,
+      NewLong extends keyof LongOptions ? true : false
+    ]
+  > extends true
+    ? never
+    : Command<
+        RequiredPositionalCount,
+        Positional,
+        LongOptions &
+          Record<NewLong, { type: Type; parse: (value: string) => string }>,
+        ShortOptions & Record<NewShort, NewLong>,
+        ExtraPositional
+      >;
+  public option<
+    const NewShort extends Exclude<ShortAllowed, keyof ShortOptions>,
     const NewLong extends string,
     const Type extends Exclude<OptionType["type"], "boolean">,
     T
@@ -255,8 +338,7 @@ export class Command<
       UnionToIntersection<NewShort> extends never ? true : false,
       UnionToIntersection<NewLong> extends never ? true : false,
       UnionToIntersection<Type> extends never ? true : false,
-      "" extends NewLong ? true : false,
-      NewLong extends FirstLetter<NewLong> ? false : true,
+      NewLong extends "" ? true : false,
       ToLetters<NewLong> extends LongAllowed ? false : true,
       NewShort extends keyof ShortOptions ? true : false,
       NewLong extends keyof LongOptions ? true : false
@@ -281,19 +363,19 @@ export class Command<
     if (short) {
       if (short.length !== 1) {
         throw new ParseError(
-          `[args-typed] short option ${short} must be a single letter`
+          `[args-typed] short option -${short} must be a single letter`
         );
       }
       if (!(SHORT_ALLOWED as readonly string[]).includes(short)) {
         throw new ParseError(
-          `[args-typed] short option ${short} must be a single letter from ${SHORT_ALLOWED.join(
+          `[args-typed] short option -${short} must be a single letter from ${SHORT_ALLOWED.join(
             ", "
           )}`
         );
       }
       if (short in this.shortOptions) {
         throw new ParseError(
-          `[args-typed] short option ${short} is already defined`
+          `[args-typed] short option -${short} is already defined`
         );
       }
     }
@@ -308,25 +390,27 @@ export class Command<
         .find((c) => !(LONG_ALLOWED as readonly string[]).includes(c))
     ) {
       throw new ParseError(
-        `[args-typed] long option ${long} must be a string of letters from ${LONG_ALLOWED.join(
+        `[args-typed] long option --${long} must be a string of letters from ${LONG_ALLOWED.join(
           ", "
         )}`
       );
     }
     if (long in this.optionsData) {
       throw new ParseError(
-        `[args-typed] long option ${long} is already defined`
+        `[args-typed] long option --${long} is already defined`
       );
     }
     return new Command(
-      this.version,
       this.description,
       this.requiredPositionalCount,
       this.positionalData,
       {
         ...this.optionsData,
         [long]: {
-          type: type === "boolean" ? { type } : { type, parse: parse! },
+          type:
+            type === "boolean"
+              ? { type }
+              : { type, parse: parse ?? ((value) => value) },
           description,
           short,
         },
@@ -371,7 +455,6 @@ export class Command<
       );
     }
     return new Command(
-      this.version,
       this.description,
       this.requiredPositionalCount,
       this.positionalData,
@@ -391,10 +474,7 @@ export class Command<
   ): CommandRegistration<Context, T> {
     const self = this;
 
-    function help(name: string, fullName: string) {
-      console.log(
-        `${name}${typeof self.version === "string" ? ` ${self.version}` : ""}\n`
-      );
+    function printDescription(fullName: string) {
       console.log(`${self.description}\n`);
       console.log(
         `Usage: ${fullName} [options]${self.positionalData
@@ -436,7 +516,7 @@ export class Command<
       }
     }
 
-    function result(
+    function run(
       args: string[],
       context: Context,
       name: string,
@@ -521,68 +601,67 @@ export class Command<
             }
           }
         } else if (current.startsWith("-")) {
-          if (current.length === 2) {
-            const shortFlags = current.slice(1);
-            let sfIndex = 0;
-            while (sfIndex < shortFlags.length) {
-              const shortFlag = shortFlags[sfIndex];
-              if (!(shortFlag in self.shortOptions)) {
+          const shortFlags = current.slice(1);
+          let sfIndex = 0;
+          while (sfIndex < shortFlags.length) {
+            const shortFlag = shortFlags[sfIndex];
+            if (!(shortFlag in self.shortOptions)) {
+              throw new ParseError(
+                `[args-typed] unknown short option -${shortFlag} given`
+              );
+            }
+            const longFlag = self.shortOptions[shortFlag]!;
+            const option = self.optionsData[longFlag]!;
+            if (option.type.type === "boolean") {
+              if (options[longFlag]) {
                 throw new ParseError(
-                  `[args-typed] unknown short option -${shortFlag} given`
+                  `[args-typed] option --${longFlag} (-${shortFlag}) given multiple times`
                 );
               }
-              const longFlag = self.shortOptions[shortFlag]!;
-              const option = self.optionsData[longFlag]!;
-              if (option.type.type === "boolean") {
-                if (options[longFlag]) {
-                  throw new ParseError(
-                    `[args-typed] option --${longFlag} (-${shortFlag}) given multiple times`
-                  );
-                }
-                options[longFlag] = true;
-                sfIndex++;
-              } else {
-                const remainingShortFlags = shortFlags.slice(sfIndex + 1);
-                if (remainingShortFlags) {
-                  if (option.type.type === "list") {
-                    options[longFlag] = [
-                      ...(options[longFlag] || []),
-                      option.type.parse(args[i]),
-                    ];
-                  } else {
-                    if (typeof options[longFlag] !== "undefined") {
-                      throw new ParseError(
-                        `[args-typed] option --${longFlag}${
-                          option.short ? ` (-${option.short})` : ""
-                        } given multiple times`
-                      );
-                    }
-                    options[longFlag] = option.type.parse(args[i]);
-                  }
+              options[longFlag] = true;
+              sfIndex++;
+            } else {
+              const remainingShortFlags = shortFlags.slice(sfIndex + 1);
+              if (remainingShortFlags) {
+                if (option.type.type === "list") {
+                  options[longFlag] = [
+                    ...(options[longFlag] || []),
+                    option.type.parse(args[i]),
+                  ];
                 } else {
-                  i++;
-                  if (i >= args.length) {
+                  if (typeof options[longFlag] !== "undefined") {
                     throw new ParseError(
-                      `[args-typed] option --${longFlag} (-${shortFlag}) requires a value`
+                      `[args-typed] option --${longFlag}${
+                        option.short ? ` (-${option.short})` : ""
+                      } given multiple times`
                     );
                   }
-                  if (option.type.type === "list") {
-                    options[longFlag] = [
-                      ...(options[longFlag] || []),
-                      option.type.parse(args[i]),
-                    ];
-                  } else {
-                    if (typeof options[longFlag] !== "undefined") {
-                      throw new ParseError(
-                        `[args-typed] option --${longFlag}${
-                          option.short ? ` (-${option.short})` : ""
-                        } given multiple times`
-                      );
-                    }
-                    options[longFlag] = option.type.parse(args[i]);
+                  options[longFlag] = option.type.parse(args[i]);
+                }
+              } else {
+                i++;
+                if (i >= args.length) {
+                  throw new ParseError(
+                    `[args-typed] option --${longFlag} (-${shortFlag}) requires a value`
+                  );
+                }
+                if (option.type.type === "list") {
+                  options[longFlag] = [
+                    ...(options[longFlag] || []),
+                    option.type.parse(args[i]),
+                  ];
+                } else {
+                  if (typeof options[longFlag] !== "undefined") {
+                    throw new ParseError(
+                      `[args-typed] option --${longFlag}${
+                        option.short ? ` (-${option.short})` : ""
+                      } given multiple times`
+                    );
                   }
+                  options[longFlag] = option.type.parse(args[i]);
                 }
               }
+              break;
             }
           }
         } else {
@@ -599,7 +678,7 @@ export class Command<
         }
       }
 
-      if (posIndex <= self.requiredPositionalCount) {
+      if (posIndex < self.requiredPositionalCount) {
         throw new ParseError(
           `[args-typed] required positional parameters not given`
         );
@@ -610,26 +689,29 @@ export class Command<
         fullName,
         args,
         context,
-        help,
-        self: result,
+        printDescription,
+        self: run,
       });
     }
 
-    return result;
+    return {
+      description: this.description,
+      run,
+    };
   }
 }
 
-export class CommandGroup<
+class CommandGroup<
   const Commands extends Partial<Record<string, never>>,
   const LongOptions extends Partial<Record<string, OptionType>>,
   const ShortOptions extends Partial<Record<string, string>>,
   const InnerContext,
-  const T
+  const Result
 > {
   private constructor(
     private readonly description: string,
     private readonly commands: Partial<
-      Record<string, CommandRegistration<InnerContext, T>>
+      Record<string, CommandRegistration<InnerContext, Result>>
     >,
     private readonly optionsData: Partial<Record<string, OptionData>>,
     private readonly shortOptions: ShortOptions,
@@ -639,7 +721,7 @@ export class CommandGroup<
     }
   ) {}
 
-  public static commandGroup<InnerContext, T>({
+  public static commandGroup<InnerContext, T = never>({
     description,
     ...options
   }: {
@@ -653,11 +735,17 @@ export class CommandGroup<
   public command<const Name extends string, T2>(
     name: Name,
     command: CommandRegistration<InnerContext, T2>
-  ): CommandGroup<Commands & Record<Name, never>, {}, {}, InnerContext, T | T2>;
+  ): CommandGroup<
+    Commands & Record<Name, never>,
+    {},
+    {},
+    InnerContext,
+    Result | T2
+  >;
   public command<const Name extends string>(
     name: Name,
-    command: CommandRegistration<InnerContext, T>
-  ): CommandGroup<Commands & Record<Name, never>, {}, {}, InnerContext, T>;
+    command: CommandRegistration<InnerContext, Result>
+  ): CommandGroup<Commands & Record<Name, never>, {}, {}, InnerContext, Result>;
   public command<const Name extends string, T2>(
     name: Name,
     command: CommandRegistration<InnerContext, T2>
@@ -667,7 +755,7 @@ export class CommandGroup<
       {},
       {},
       InnerContext,
-      T | T2
+      Result | T2
     >(
       this.description,
       {
@@ -680,7 +768,7 @@ export class CommandGroup<
     );
   }
 
-  public option<const NewLong extends string, T>(
+  public option<const NewLong extends string>(
     short: undefined,
     long: NewLong,
     description: string,
@@ -688,8 +776,7 @@ export class CommandGroup<
   ): Or<
     [
       UnionToIntersection<NewLong> extends never ? true : false,
-      "" extends NewLong ? true : false,
-      NewLong extends FirstLetter<NewLong> ? false : true,
+      NewLong extends "" ? true : false,
       ToLetters<NewLong> extends LongAllowed ? false : true,
       NewLong extends keyof LongOptions ? true : false
     ]
@@ -700,7 +787,33 @@ export class CommandGroup<
         LongOptions & Record<NewLong, { type: "boolean" }>,
         ShortOptions,
         InnerContext,
-        T
+        Result
+      >;
+  public option<
+    const NewLong extends string,
+    const Type extends Exclude<OptionType["type"], "boolean">
+  >(
+    short: undefined,
+    long: NewLong,
+    description: string,
+    type: Type
+  ): Or<
+    [
+      UnionToIntersection<NewLong> extends never ? true : false,
+      UnionToIntersection<Type> extends never ? true : false,
+      NewLong extends "" ? true : false,
+      ToLetters<NewLong> extends LongAllowed ? false : true,
+      NewLong extends keyof LongOptions ? true : false
+    ]
+  > extends true
+    ? never
+    : CommandGroup<
+        Commands,
+        LongOptions &
+          Record<NewLong, { type: Type; parse: (value: string) => string }>,
+        ShortOptions,
+        InnerContext,
+        Result
       >;
   public option<
     const NewLong extends string,
@@ -716,8 +829,7 @@ export class CommandGroup<
     [
       UnionToIntersection<NewLong> extends never ? true : false,
       UnionToIntersection<Type> extends never ? true : false,
-      "" extends NewLong ? true : false,
-      NewLong extends FirstLetter<NewLong> ? false : true,
+      NewLong extends "" ? true : false,
       ToLetters<NewLong> extends LongAllowed ? false : true,
       NewLong extends keyof LongOptions ? true : false
     ]
@@ -732,9 +844,8 @@ export class CommandGroup<
         T
       >;
   public option<
-    const NewShort extends ShortAllowed,
-    const NewLong extends string,
-    T
+    const NewShort extends Exclude<ShortAllowed, keyof ShortOptions>,
+    const NewLong extends string
   >(
     short: NewShort,
     long: NewLong,
@@ -744,8 +855,7 @@ export class CommandGroup<
     [
       UnionToIntersection<NewShort> extends never ? true : false,
       UnionToIntersection<NewLong> extends never ? true : false,
-      "" extends NewLong ? true : false,
-      NewLong extends FirstLetter<NewLong> ? false : true,
+      NewLong extends "" ? true : false,
       ToLetters<NewLong> extends LongAllowed ? false : true,
       NewShort extends keyof ShortOptions ? true : false,
       NewLong extends keyof LongOptions ? true : false
@@ -757,10 +867,39 @@ export class CommandGroup<
         LongOptions & Record<NewLong, { type: "boolean" }>,
         ShortOptions & Record<NewShort, NewLong>,
         InnerContext,
-        T
+        Result
       >;
   public option<
-    const NewShort extends ShortAllowed,
+    const NewShort extends Exclude<ShortAllowed, keyof ShortOptions>,
+    const NewLong extends string,
+    const Type extends Exclude<OptionType["type"], "boolean">
+  >(
+    short: NewShort,
+    long: NewLong,
+    description: string,
+    type: Type
+  ): Or<
+    [
+      UnionToIntersection<NewShort> extends never ? true : false,
+      UnionToIntersection<NewLong> extends never ? true : false,
+      UnionToIntersection<Type> extends never ? true : false,
+      NewLong extends "" ? true : false,
+      ToLetters<NewLong> extends LongAllowed ? false : true,
+      NewShort extends keyof ShortOptions ? true : false,
+      NewLong extends keyof LongOptions ? true : false
+    ]
+  > extends true
+    ? never
+    : CommandGroup<
+        Commands,
+        LongOptions &
+          Record<NewLong, { type: Type; parse: (value: string) => string }>,
+        ShortOptions & Record<NewShort, NewLong>,
+        InnerContext,
+        Result
+      >;
+  public option<
+    const NewShort extends Exclude<ShortAllowed, keyof ShortOptions>,
     const NewLong extends string,
     const Type extends Exclude<OptionType["type"], "boolean">,
     T
@@ -775,8 +914,7 @@ export class CommandGroup<
       UnionToIntersection<NewShort> extends never ? true : false,
       UnionToIntersection<NewLong> extends never ? true : false,
       UnionToIntersection<Type> extends never ? true : false,
-      "" extends NewLong ? true : false,
-      NewLong extends FirstLetter<NewLong> ? false : true,
+      NewLong extends "" ? true : false,
       ToLetters<NewLong> extends LongAllowed ? false : true,
       NewShort extends keyof ShortOptions ? true : false,
       NewLong extends keyof LongOptions ? true : false
@@ -801,19 +939,19 @@ export class CommandGroup<
     if (short) {
       if (short.length !== 1) {
         throw new ParseError(
-          `[args-typed] short option ${short} must be a single letter`
+          `[args-typed] short option -${short} must be a single letter`
         );
       }
       if (!(SHORT_ALLOWED as readonly string[]).includes(short)) {
         throw new ParseError(
-          `[args-typed] short option ${short} must be a single letter from ${SHORT_ALLOWED.join(
+          `[args-typed] short option -${short} must be a single letter from ${SHORT_ALLOWED.join(
             ", "
           )}`
         );
       }
       if (short in this.shortOptions) {
         throw new ParseError(
-          `[args-typed] short option ${short} is already defined`
+          `[args-typed] short option -${short} is already defined`
         );
       }
     }
@@ -828,14 +966,14 @@ export class CommandGroup<
         .find((c) => !(LONG_ALLOWED as readonly string[]).includes(c))
     ) {
       throw new ParseError(
-        `[args-typed] long option ${long} must be a string of letters from ${LONG_ALLOWED.join(
+        `[args-typed] long option --${long} must be a string of letters from ${LONG_ALLOWED.join(
           ", "
         )}`
       );
     }
     if (long in this.optionsData) {
       throw new ParseError(
-        `[args-typed] long option ${long} is already defined`
+        `[args-typed] long option --${long} is already defined`
       );
     }
     return new CommandGroup(
@@ -844,7 +982,10 @@ export class CommandGroup<
       {
         ...this.optionsData,
         [long]: {
-          type: type === "boolean" ? { type } : { type, parse: parse! },
+          type:
+            type === "boolean"
+              ? { type }
+              : { type, parse: parse ?? ((value) => value) },
           description,
           short,
         },
@@ -855,10 +996,52 @@ export class CommandGroup<
   }
 
   public build<OuterContext>(
-    mapContext: (context: OuterContext) => InnerContext
-  ): CommandRegistration<OuterContext, T> {
-    return (args, context, name, fullName) => {
-      const innerContext = mapContext(context);
+    mapContext: (
+      args: string[],
+      options: Options<LongOptions>,
+      context: CommandGroupContext<OuterContext, Result>
+    ) => InnerContext
+  ): CommandRegistration<OuterContext, Result> {
+    const self = this;
+
+    function printDescription(fullName: string) {
+      console.log(`${self.description}\n`);
+      console.log(
+        `Usage: ${fullName} [options] <subcommand> [subcommand options] [...subcommand arguments]\n`
+      );
+      console.log(
+        `Subcommands:\n${Object.entries(
+          self.commands as Record<
+            string,
+            CommandRegistration<InnerContext, Result>
+          >
+        )
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([name, { description }]) => `  ${name} - ${description}`)
+          .join("\n")}\n`
+      );
+      if (Object.keys(self.optionsData).length > 0) {
+        console.log(
+          `Options:\n${Object.entries(
+            self.optionsData as Record<string, OptionData>
+          )
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([long, { type, description, short }]) => {
+              return `  ${short ? `-${short}, ` : "    "}--${long}${
+                type.type === "boolean" ? "" : ` <value>`
+              } ${description}`;
+            })
+            .join("\n")}\n`
+        );
+      }
+    }
+
+    function run(
+      args: string[],
+      context: OuterContext,
+      name: string,
+      fullName: string
+    ): Result {
       const options: any = {};
       let command: string | undefined;
       let i = 0;
@@ -887,12 +1070,12 @@ export class CommandGroup<
           } else {
             longFlag = current.slice(2);
           }
-          if (!(longFlag in this.optionsData)) {
+          if (!(longFlag in self.optionsData)) {
             throw new ParseError(
               `[args-typed] unknown option --${longFlag} given`
             );
           }
-          const option = this.optionsData[longFlag]!;
+          const option = self.optionsData[longFlag]!;
           if (option.type.type === "boolean") {
             if (typeof potentialValue === "string") {
               throw new ParseError(
@@ -932,68 +1115,67 @@ export class CommandGroup<
             }
           }
         } else if (current.startsWith("-")) {
-          if (current.length === 2) {
-            const shortFlags = current.slice(1);
-            let sfIndex = 0;
-            while (sfIndex < shortFlags.length) {
-              const shortFlag = shortFlags[sfIndex];
-              if (!(shortFlag in this.shortOptions)) {
+          const shortFlags = current.slice(1);
+          let sfIndex = 0;
+          while (sfIndex < shortFlags.length) {
+            const shortFlag = shortFlags[sfIndex];
+            if (!(shortFlag in self.shortOptions)) {
+              throw new ParseError(
+                `[args-typed] unknown short option -${shortFlag} given`
+              );
+            }
+            const longFlag = self.shortOptions[shortFlag]!;
+            const option = self.optionsData[longFlag]!;
+            if (option.type.type === "boolean") {
+              if (options[longFlag]) {
                 throw new ParseError(
-                  `[args-typed] unknown short option -${shortFlag} given`
+                  `[args-typed] option --${longFlag} (-${shortFlag}) given multiple times`
                 );
               }
-              const longFlag = this.shortOptions[shortFlag]!;
-              const option = this.optionsData[longFlag]!;
-              if (option.type.type === "boolean") {
-                if (options[longFlag]) {
-                  throw new ParseError(
-                    `[args-typed] option --${longFlag} (-${shortFlag}) given multiple times`
-                  );
-                }
-                options[longFlag] = true;
-                sfIndex++;
-              } else {
-                const remainingShortFlags = shortFlags.slice(sfIndex + 1);
-                if (remainingShortFlags) {
-                  if (option.type.type === "list") {
-                    options[longFlag] = [
-                      ...(options[longFlag] || []),
-                      option.type.parse(args[i]),
-                    ];
-                  } else {
-                    if (typeof options[longFlag] !== "undefined") {
-                      throw new ParseError(
-                        `[args-typed] option --${longFlag}${
-                          option.short ? ` (-${option.short})` : ""
-                        } given multiple times`
-                      );
-                    }
-                    options[longFlag] = option.type.parse(args[i]);
-                  }
+              options[longFlag] = true;
+              sfIndex++;
+            } else {
+              const remainingShortFlags = shortFlags.slice(sfIndex + 1);
+              if (remainingShortFlags) {
+                if (option.type.type === "list") {
+                  options[longFlag] = [
+                    ...(options[longFlag] || []),
+                    option.type.parse(args[i]),
+                  ];
                 } else {
-                  i++;
-                  if (i >= args.length) {
+                  if (typeof options[longFlag] !== "undefined") {
                     throw new ParseError(
-                      `[args-typed] option --${longFlag} (-${shortFlag}) requires a value`
+                      `[args-typed] option --${longFlag}${
+                        option.short ? ` (-${option.short})` : ""
+                      } given multiple times`
                     );
                   }
-                  if (option.type.type === "list") {
-                    options[longFlag] = [
-                      ...(options[longFlag] || []),
-                      option.type.parse(args[i]),
-                    ];
-                  } else {
-                    if (typeof options[longFlag] !== "undefined") {
-                      throw new ParseError(
-                        `[args-typed] option --${longFlag}${
-                          option.short ? ` (-${option.short})` : ""
-                        } given multiple times`
-                      );
-                    }
-                    options[longFlag] = option.type.parse(args[i]);
+                  options[longFlag] = option.type.parse(args[i]);
+                }
+              } else {
+                i++;
+                if (i >= args.length) {
+                  throw new ParseError(
+                    `[args-typed] option --${longFlag} (-${shortFlag}) requires a value`
+                  );
+                }
+                if (option.type.type === "list") {
+                  options[longFlag] = [
+                    ...(options[longFlag] || []),
+                    option.type.parse(args[i]),
+                  ];
+                } else {
+                  if (typeof options[longFlag] !== "undefined") {
+                    throw new ParseError(
+                      `[args-typed] option --${longFlag}${
+                        option.short ? ` (-${option.short})` : ""
+                      } given multiple times`
+                    );
                   }
+                  options[longFlag] = option.type.parse(args[i]);
                 }
               }
+              break;
             }
           }
         } else {
@@ -1008,18 +1190,32 @@ export class CommandGroup<
           `[args-typed] no subcommand given in group ${fullName}`
         );
       }
-      if (!(command in this.commands)) {
+      if (!(command in self.commands)) {
         throw new ParseError(
           `[args-typed] subcommand ${command} not found in group ${fullName}`
         );
       }
 
-      return this.commands[command]!(
-        args,
+      const sliced = args.slice(i);
+      const innerContext = mapContext(sliced, options, {
+        name,
+        fullName,
+        args: sliced,
+        context,
+        printDescription,
+        self: run,
+      });
+      return self.commands[command]!.run(
+        sliced,
         innerContext,
         command,
         `${fullName} ${command}`
       );
+    }
+
+    return {
+      description: this.description,
+      run,
     };
   }
 }
@@ -1036,9 +1232,6 @@ type ToLetters<S extends string, R = never> = S extends ""
   : never;
 type ShortAllowed = (typeof SHORT_ALLOWED)[number];
 type LongAllowed = (typeof LONG_ALLOWED)[number];
-type FirstLetter<S extends string> = S extends `${infer I}${infer _}`
-  ? I
-  : never;
 type Or<T extends boolean[]> = true extends T[number] ? true : false;
 
 // prettier-ignore
@@ -1049,3 +1242,15 @@ const SHORT_ALLOWED = [
   '_',
 ] as const;
 const LONG_ALLOWED = [...SHORT_ALLOWED, "-"] as const;
+
+export type { Command, CommandGroup };
+export const command = Command.command;
+export const commandGroup = CommandGroup.commandGroup;
+export function run<Context, T>(
+  cmd: CommandRegistration<Context, T>,
+  args: string[],
+  context: Context,
+  name: string
+) {
+  return cmd.run(args, context, name, name);
+}
