@@ -54,12 +54,6 @@ interface CommandRegistration<Context, T> {
   run: (args: string[], context: Context, name: string, fullName: string) => T;
 }
 
-export class ValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-  }
-}
-
 export class ParseError extends Error {
   constructor(
     message: string,
@@ -191,13 +185,13 @@ class Command<
   ): unknown {
     if (required) {
       if (this.positionalData.length !== this.requiredPositionalCount) {
-        throw new ValidationError(
+        throw new Error(
           `[args-typed] required positional parameter ${name} cannot be after optional positional parameters`
         );
       }
     } else {
       if (this.extraPositional) {
-        throw new ValidationError(
+        throw new Error(
           `[args-typed] optional positional parameter ${name} and extra positional parameters cannot be used together`
         );
       }
@@ -386,43 +380,39 @@ class Command<
   ): unknown {
     if (short) {
       if (short.length !== 1) {
-        throw new ValidationError(
+        throw new Error(
           `[args-typed] short option -${short} must be a single letter`
         );
       }
       if (!(SHORT_ALLOWED as readonly string[]).includes(short)) {
-        throw new ValidationError(
+        throw new Error(
           `[args-typed] short option -${short} must be a single letter from ${SHORT_ALLOWED.join(
             ", "
           )}`
         );
       }
       if (short in this.shortOptions) {
-        throw new ValidationError(
+        throw new Error(
           `[args-typed] short option -${short} is already defined`
         );
       }
     }
     if (long.length === 0) {
-      throw new ValidationError(
-        `[args-typed] long option must be a non-empty string`
-      );
+      throw new Error(`[args-typed] long option must be a non-empty string`);
     }
     if (
       long
         .split("")
         .find((c) => !(LONG_ALLOWED as readonly string[]).includes(c))
     ) {
-      throw new ValidationError(
+      throw new Error(
         `[args-typed] long option --${long} must be a string of letters from ${LONG_ALLOWED.join(
           ", "
         )}`
       );
     }
     if (long in this.optionsData) {
-      throw new ValidationError(
-        `[args-typed] long option --${long} is already defined`
-      );
+      throw new Error(`[args-typed] long option --${long} is already defined`);
     }
     return new Command(
       this.description,
@@ -470,7 +460,7 @@ class Command<
     parse?: (value: string) => unknown
   ): unknown {
     if (this.extraPositional) {
-      throw new ValidationError(
+      throw new Error(
         `[args-typed] extra positional parameters already registered`
       );
     }
@@ -1006,43 +996,39 @@ class CommandGroup<
   ): unknown {
     if (short) {
       if (short.length !== 1) {
-        throw new ValidationError(
+        throw new Error(
           `[args-typed] short option -${short} must be a single letter`
         );
       }
       if (!(SHORT_ALLOWED as readonly string[]).includes(short)) {
-        throw new ValidationError(
+        throw new Error(
           `[args-typed] short option -${short} must be a single letter from ${SHORT_ALLOWED.join(
             ", "
           )}`
         );
       }
       if (short in this.shortOptions) {
-        throw new ValidationError(
+        throw new Error(
           `[args-typed] short option -${short} is already defined`
         );
       }
     }
     if (long.length === 0) {
-      throw new ValidationError(
-        `[args-typed] long option must be a non-empty string`
-      );
+      throw new Error(`[args-typed] long option must be a non-empty string`);
     }
     if (
       long
         .split("")
         .find((c) => !(LONG_ALLOWED as readonly string[]).includes(c))
     ) {
-      throw new ValidationError(
+      throw new Error(
         `[args-typed] long option --${long} must be a string of letters from ${LONG_ALLOWED.join(
           ", "
         )}`
       );
     }
     if (long in this.optionsData) {
-      throw new ValidationError(
-        `[args-typed] long option --${long} is already defined`
-      );
+      throw new Error(`[args-typed] long option --${long} is already defined`);
     }
     return new CommandGroup(
       this.description,
