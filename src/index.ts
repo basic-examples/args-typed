@@ -609,7 +609,10 @@ class Command<
                 option.type.parse(args[i]),
               ];
             } else {
-              if (!allowDuplicateOptions && typeof options[longFlag] !== "undefined") {
+              if (
+                !allowDuplicateOptions &&
+                typeof options[longFlag] !== "undefined"
+              ) {
                 throw new ParseError(
                   `[args-typed] option --${longFlag}${
                     option.short ? ` (-${option.short})` : ""
@@ -648,7 +651,10 @@ class Command<
                     option.type.parse(remainingShortFlags),
                   ];
                 } else {
-                  if (!allowDuplicateOptions && typeof options[longFlag] !== "undefined") {
+                  if (
+                    !allowDuplicateOptions &&
+                    typeof options[longFlag] !== "undefined"
+                  ) {
                     throw new ParseError(
                       `[args-typed] option --${longFlag}${
                         option.short ? ` (-${option.short})` : ""
@@ -670,7 +676,10 @@ class Command<
                     option.type.parse(args[i]),
                   ];
                 } else {
-                  if (!allowDuplicateOptions && typeof options[longFlag] !== "undefined") {
+                  if (
+                    !allowDuplicateOptions &&
+                    typeof options[longFlag] !== "undefined"
+                  ) {
                     throw new ParseError(
                       `[args-typed] option --${longFlag}${
                         option.short ? ` (-${option.short})` : ""
@@ -1123,7 +1132,10 @@ class CommandGroup<
                 option.type.parse(args[i]),
               ];
             } else {
-              if (!allowDuplicateOptions && typeof options[longFlag] !== "undefined") {
+              if (
+                !allowDuplicateOptions &&
+                typeof options[longFlag] !== "undefined"
+              ) {
                 throw new ParseError(
                   `[args-typed] option --${longFlag}${
                     option.short ? ` (-${option.short})` : ""
@@ -1138,11 +1150,11 @@ class CommandGroup<
           let sfIndex = 0;
           while (sfIndex < shortFlags.length) {
             const shortFlag = shortFlags[sfIndex];
-          if (!(shortFlag in self.shortOptions)) {
-            throw new ParseError(
-              `[args-typed] unknown short option -${shortFlag} given`
-            );
-          }
+            if (!(shortFlag in self.shortOptions)) {
+              throw new ParseError(
+                `[args-typed] unknown short option -${shortFlag} given`
+              );
+            }
             const longFlag = self.shortOptions[shortFlag]!;
             const option = self.optionsData[longFlag]!;
             if (option.type.type === "boolean") {
@@ -1162,7 +1174,10 @@ class CommandGroup<
                     option.type.parse(remainingShortFlags),
                   ];
                 } else {
-                  if (!allowDuplicateOptions && typeof options[longFlag] !== "undefined") {
+                  if (
+                    !allowDuplicateOptions &&
+                    typeof options[longFlag] !== "undefined"
+                  ) {
                     throw new ParseError(
                       `[args-typed] option --${longFlag}${
                         option.short ? ` (-${option.short})` : ""
@@ -1184,7 +1199,10 @@ class CommandGroup<
                     option.type.parse(args[i]),
                   ];
                 } else {
-                  if (!allowDuplicateOptions && typeof options[longFlag] !== "undefined") {
+                  if (
+                    !allowDuplicateOptions &&
+                    typeof options[longFlag] !== "undefined"
+                  ) {
                     throw new ParseError(
                       `[args-typed] option --${longFlag}${
                         option.short ? ` (-${option.short})` : ""
@@ -1217,8 +1235,8 @@ class CommandGroup<
 
       const sliced = args.slice(i);
       const innerContext = mapContext(options, {
-        name: command,
-        fullName: `${fullName} ${command}`,
+        name,
+        fullName,
         args: sliced,
         context,
         printDescription,

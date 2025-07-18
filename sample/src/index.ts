@@ -37,7 +37,7 @@ const copy = command({
     }
   );
 
-const echoTest = command({
+const echo = command({
   description: "Shell echo replacement",
 })
   .extra("messages", "messages to print")
@@ -90,12 +90,27 @@ const echoTest = command({
     }
   );
 
+const nested = commandGroup<AppContext>({
+  description: "Nested command group",
+})
+  .command("echo", echo)
+  .command("cp", copy)
+  .command("copy", copy)
+  .build<AppContext>((_, { context }) => context);
+
+const nested2 = commandGroup<AppContext>({
+  description: "Nested command group 2",
+})
+  .command("nested", nested)
+  .build<AppContext>((_, { context }) => context);
+
 const app = commandGroup<AppContext>({
   description: "Sample app",
 })
   .command("copy", copy)
   .command("cp", copy)
-  .command("echo", echoTest)
+  .command("echo", echo)
+  .command("n", nested2)
   .option("v", "version", "Show version", "boolean")
   .option("h", "help", "Show help", "boolean")
   .option("C", "cwd", "change directory", "scalar")
