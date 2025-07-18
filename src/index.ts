@@ -421,10 +421,27 @@ class Command<
     );
   }
 
-  public extra<T>(
-    parse: (value: string) => T,
+  public extra(
     name: string,
     description: string
+  ): Or<
+    [
+      ExtraPositional extends never ? false : true,
+      RequiredPositionalCount extends Positional["length"] ? false : true
+    ]
+  > extends true
+    ? never
+    : Command<
+        RequiredPositionalCount,
+        Positional,
+        LongOptions,
+        ShortOptions,
+        string
+      >;
+  public extra<T>(
+    name: string,
+    description: string,
+    parse: (value: string) => T
   ): Or<
     [
       ExtraPositional extends never ? false : true,
@@ -440,9 +457,9 @@ class Command<
         T
       >;
   public extra(
-    parse: (value: string) => unknown,
     name: string,
-    description: string
+    description: string,
+    parse?: (value: string) => unknown
   ): unknown {
     if (this.extraPositional) {
       throw new ParseError(
@@ -460,7 +477,7 @@ class Command<
       this.positionalData,
       this.optionsData,
       this.shortOptions,
-      { parse, name, description },
+      { parse: parse ?? ((value) => value), name, description },
       this.parseOptions
     );
   }
@@ -626,7 +643,7 @@ class Command<
                 if (option.type.type === "list") {
                   options[longFlag] = [
                     ...(options[longFlag] || []),
-                    option.type.parse(args[i]),
+                    option.type.parse(remainingShortFlags),
                   ];
                 } else {
                   if (typeof options[longFlag] !== "undefined") {
@@ -636,7 +653,7 @@ class Command<
                       } given multiple times`
                     );
                   }
-                  options[longFlag] = option.type.parse(args[i]);
+                  options[longFlag] = option.type.parse(remainingShortFlags);
                 }
               } else {
                 i++;
@@ -684,7 +701,7 @@ class Command<
         );
       }
 
-      return action(positional as any, options, {
+      return action([...positional, ...extra] as any, options, {
         name,
         fullName,
         args,
@@ -997,7 +1014,6 @@ class CommandGroup<
 
   public build<OuterContext>(
     mapContext: (
-      args: string[],
       options: Options<LongOptions>,
       context: CommandGroupContext<OuterContext, Result>
     ) => InnerContext
@@ -1140,7 +1156,7 @@ class CommandGroup<
                 if (option.type.type === "list") {
                   options[longFlag] = [
                     ...(options[longFlag] || []),
-                    option.type.parse(args[i]),
+                    option.type.parse(remainingShortFlags),
                   ];
                 } else {
                   if (typeof options[longFlag] !== "undefined") {
@@ -1150,7 +1166,7 @@ class CommandGroup<
                       } given multiple times`
                     );
                   }
-                  options[longFlag] = option.type.parse(args[i]);
+                  options[longFlag] = option.type.parse(remainingShortFlags);
                 }
               } else {
                 i++;
@@ -1197,9 +1213,9 @@ class CommandGroup<
       }
 
       const sliced = args.slice(i);
-      const innerContext = mapContext(sliced, options, {
-        name,
-        fullName,
+      const innerContext = mapContext(options, {
+        name: command,
+        fullName: `${fullName} ${command}`,
         args: sliced,
         context,
         printDescription,
