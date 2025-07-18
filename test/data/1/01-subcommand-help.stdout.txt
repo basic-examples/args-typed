@@ -7,8 +7,8 @@ Positional parameters:
   [destination] - The destination file
 
 Options:
-      --dry-run Dry run
-  -f, --force Force overwrite
-  -h, --help Show help
-  -r, --recursive Copy recursively
+      --dry-run - Dry run
+  -f, --force - Force overwrite
+  -h, --help - Show help
+  -r, --recursive - Copy recursively
 

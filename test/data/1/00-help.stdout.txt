@@ -8,7 +8,7 @@ Subcommands:
   echo - Shell echo replacement
 
 Options:
-  -C, --cwd <value> change directory
-  -h, --help Show help
-  -v, --version Show version
+  -C, --cwd <value> - change directory
+  -h, --help - Show help
+  -v, --version - Show version
 

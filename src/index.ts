@@ -523,7 +523,7 @@ class Command<
             .map(([long, { type, description, short }]) => {
               return `  ${short ? `-${short}, ` : "    "}--${long}${
                 type.type === "boolean" ? "" : ` <value>`
-              } ${description}`;
+              } - ${description}`;
             })
             .join("\n")}\n`
         );
@@ -1106,7 +1106,7 @@ class CommandGroup<
             .map(([long, { type, description, short }]) => {
               return `  ${short ? `-${short}, ` : "    "}--${long}${
                 type.type === "boolean" ? "" : ` <value>`
-              } ${description}`;
+              } - ${description}`;
             })
             .join("\n")}\n`
         );
