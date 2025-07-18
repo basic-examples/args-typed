@@ -171,29 +171,25 @@ class Command<
     description: string,
     parse?: ((value: string) => string) | undefined,
     required?: false
-  ): RequiredPositionalCount extends Positional["length"]
-    ? Command<
-        RequiredPositionalCount,
-        [...Positional, string],
-        LongOptions,
-        ShortOptions,
-        ExtraPositional
-      >
-    : never;
+  ): Command<
+    RequiredPositionalCount,
+    [...Positional, string | undefined],
+    LongOptions,
+    ShortOptions,
+    ExtraPositional
+  >;
   public positional<T>(
     name: string,
     description: string,
     parse: (value: string) => T,
     required: false
-  ): RequiredPositionalCount extends Positional["length"]
-    ? Command<
-        RequiredPositionalCount,
-        [...Positional, T],
-        LongOptions,
-        ShortOptions,
-        ExtraPositional
-      >
-    : never;
+  ): Command<
+    RequiredPositionalCount,
+    [...Positional, T | undefined],
+    LongOptions,
+    ShortOptions,
+    ExtraPositional
+  >;
   public positional(
     name: string,
     description: string,
@@ -204,12 +200,6 @@ class Command<
       if (this.positionalData.length !== this.requiredPositionalCount) {
         throw new Error(
           `[args-typed] required positional parameter ${name} cannot be after optional positional parameters`
-        );
-      }
-    } else {
-      if (this.extraPositional) {
-        throw new Error(
-          `[args-typed] optional positional parameter ${name} and extra positional parameters cannot be used together`
         );
       }
     }
