@@ -539,6 +539,8 @@ class Command<
       name: string,
       fullName: string
     ): T {
+      const { allowOptionAfterPositional, allowDuplicateOptions } =
+        self.parseOptions;
       const positional: any[] = [];
       const options: any = {};
       const extra: any[] = [];
@@ -585,7 +587,7 @@ class Command<
                 `[args-typed] boolean option --${longFlag} does not take a value`
               );
             }
-            if (options[longFlag]) {
+            if (!allowDuplicateOptions && options[longFlag]) {
               throw new ParseError(
                 `[args-typed] option --${longFlag}${
                   option.short ? ` (-${option.short})` : ""
@@ -607,7 +609,7 @@ class Command<
                 option.type.parse(args[i]),
               ];
             } else {
-              if (typeof options[longFlag] !== "undefined") {
+              if (!allowDuplicateOptions && typeof options[longFlag] !== "undefined") {
                 throw new ParseError(
                   `[args-typed] option --${longFlag}${
                     option.short ? ` (-${option.short})` : ""
@@ -630,7 +632,7 @@ class Command<
             const longFlag = self.shortOptions[shortFlag]!;
             const option = self.optionsData[longFlag]!;
             if (option.type.type === "boolean") {
-              if (options[longFlag]) {
+              if (!allowDuplicateOptions && options[longFlag]) {
                 throw new ParseError(
                   `[args-typed] option --${longFlag} (-${shortFlag}) given multiple times`
                 );
@@ -646,7 +648,7 @@ class Command<
                     option.type.parse(remainingShortFlags),
                   ];
                 } else {
-                  if (typeof options[longFlag] !== "undefined") {
+                  if (!allowDuplicateOptions && typeof options[longFlag] !== "undefined") {
                     throw new ParseError(
                       `[args-typed] option --${longFlag}${
                         option.short ? ` (-${option.short})` : ""
@@ -668,7 +670,7 @@ class Command<
                     option.type.parse(args[i]),
                   ];
                 } else {
-                  if (typeof options[longFlag] !== "undefined") {
+                  if (!allowDuplicateOptions && typeof options[longFlag] !== "undefined") {
                     throw new ParseError(
                       `[args-typed] option --${longFlag}${
                         option.short ? ` (-${option.short})` : ""
@@ -682,7 +684,9 @@ class Command<
             }
           }
         } else {
-          parsingFlag = false;
+          if (!allowOptionAfterPositional) {
+            parsingFlag = false;
+          }
           if (posIndex < self.positionalData.length) {
             positional.push(self.positionalData[posIndex].parse(current));
             posIndex++;
@@ -733,7 +737,6 @@ class CommandGroup<
     private readonly optionsData: Partial<Record<string, OptionData>>,
     private readonly shortOptions: ShortOptions,
     private readonly parseOptions: {
-      allowOptionAfterPositional?: boolean;
       allowDuplicateOptions?: boolean;
     }
   ) {}
@@ -743,7 +746,6 @@ class CommandGroup<
     ...options
   }: {
     description: string;
-    allowOptionAfterPositional?: boolean;
     allowDuplicateOptions?: boolean;
   }): CommandGroup<{}, {}, {}, InnerContext, T> {
     return new CommandGroup(description, {}, {}, {}, options);
@@ -1058,6 +1060,7 @@ class CommandGroup<
       name: string,
       fullName: string
     ): Result {
+      const { allowDuplicateOptions } = self.parseOptions;
       const options: any = {};
       let command: string | undefined;
       let i = 0;
@@ -1098,7 +1101,7 @@ class CommandGroup<
                 `[args-typed] boolean option --${longFlag} does not take a value`
               );
             }
-            if (options[longFlag]) {
+            if (!allowDuplicateOptions && options[longFlag]) {
               throw new ParseError(
                 `[args-typed] option --${longFlag}${
                   option.short ? ` (-${option.short})` : ""
@@ -1120,7 +1123,7 @@ class CommandGroup<
                 option.type.parse(args[i]),
               ];
             } else {
-              if (typeof options[longFlag] !== "undefined") {
+              if (!allowDuplicateOptions && typeof options[longFlag] !== "undefined") {
                 throw new ParseError(
                   `[args-typed] option --${longFlag}${
                     option.short ? ` (-${option.short})` : ""
@@ -1135,15 +1138,15 @@ class CommandGroup<
           let sfIndex = 0;
           while (sfIndex < shortFlags.length) {
             const shortFlag = shortFlags[sfIndex];
-            if (!(shortFlag in self.shortOptions)) {
-              throw new ParseError(
-                `[args-typed] unknown short option -${shortFlag} given`
-              );
-            }
+          if (!(shortFlag in self.shortOptions)) {
+            throw new ParseError(
+              `[args-typed] unknown short option -${shortFlag} given`
+            );
+          }
             const longFlag = self.shortOptions[shortFlag]!;
             const option = self.optionsData[longFlag]!;
             if (option.type.type === "boolean") {
-              if (options[longFlag]) {
+              if (!allowDuplicateOptions && options[longFlag]) {
                 throw new ParseError(
                   `[args-typed] option --${longFlag} (-${shortFlag}) given multiple times`
                 );
@@ -1159,7 +1162,7 @@ class CommandGroup<
                     option.type.parse(remainingShortFlags),
                   ];
                 } else {
-                  if (typeof options[longFlag] !== "undefined") {
+                  if (!allowDuplicateOptions && typeof options[longFlag] !== "undefined") {
                     throw new ParseError(
                       `[args-typed] option --${longFlag}${
                         option.short ? ` (-${option.short})` : ""
@@ -1181,7 +1184,7 @@ class CommandGroup<
                     option.type.parse(args[i]),
                   ];
                 } else {
-                  if (typeof options[longFlag] !== "undefined") {
+                  if (!allowDuplicateOptions && typeof options[longFlag] !== "undefined") {
                     throw new ParseError(
                       `[args-typed] option --${longFlag}${
                         option.short ? ` (-${option.short})` : ""
