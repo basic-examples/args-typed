@@ -54,8 +54,18 @@ interface CommandRegistration<Context, T> {
   run: (args: string[], context: Context, name: string, fullName: string) => T;
 }
 
-export class ParseError extends Error {
+export class ValidationError extends Error {
   constructor(message: string) {
+    super(message);
+  }
+}
+
+export class ParseError extends Error {
+  constructor(
+    message: string,
+    public readonly printDescription: (fullName: string) => void,
+    public readonly fullName: string
+  ) {
     super(message);
   }
 }
@@ -181,13 +191,13 @@ class Command<
   ): unknown {
     if (required) {
       if (this.positionalData.length !== this.requiredPositionalCount) {
-        throw new ParseError(
+        throw new ValidationError(
           `[args-typed] required positional parameter ${name} cannot be after optional positional parameters`
         );
       }
     } else {
       if (this.extraPositional) {
-        throw new ParseError(
+        throw new ValidationError(
           `[args-typed] optional positional parameter ${name} and extra positional parameters cannot be used together`
         );
       }
@@ -376,25 +386,25 @@ class Command<
   ): unknown {
     if (short) {
       if (short.length !== 1) {
-        throw new ParseError(
+        throw new ValidationError(
           `[args-typed] short option -${short} must be a single letter`
         );
       }
       if (!(SHORT_ALLOWED as readonly string[]).includes(short)) {
-        throw new ParseError(
+        throw new ValidationError(
           `[args-typed] short option -${short} must be a single letter from ${SHORT_ALLOWED.join(
             ", "
           )}`
         );
       }
       if (short in this.shortOptions) {
-        throw new ParseError(
+        throw new ValidationError(
           `[args-typed] short option -${short} is already defined`
         );
       }
     }
     if (long.length === 0) {
-      throw new ParseError(
+      throw new ValidationError(
         `[args-typed] long option must be a non-empty string`
       );
     }
@@ -403,14 +413,14 @@ class Command<
         .split("")
         .find((c) => !(LONG_ALLOWED as readonly string[]).includes(c))
     ) {
-      throw new ParseError(
+      throw new ValidationError(
         `[args-typed] long option --${long} must be a string of letters from ${LONG_ALLOWED.join(
           ", "
         )}`
       );
     }
     if (long in this.optionsData) {
-      throw new ParseError(
+      throw new ValidationError(
         `[args-typed] long option --${long} is already defined`
       );
     }
@@ -460,7 +470,7 @@ class Command<
     parse?: (value: string) => unknown
   ): unknown {
     if (this.extraPositional) {
-      throw new ParseError(
+      throw new ValidationError(
         `[args-typed] extra positional parameters already registered`
       );
     }
@@ -554,13 +564,21 @@ class Command<
             posIndex++;
           } else {
             if (!self.extraPositional) {
-              throw new ParseError("Extra positional argument given");
+              throw new ParseError(
+                "[args-typed] extra positional argument given",
+                printDescription,
+                fullName
+              );
             }
             extra.push(self.extraPositional.parse(current));
           }
           continue;
         } else if (current === "-") {
-          throw new ParseError("Single dash '-' is invalid unless after `--`.");
+          throw new ParseError(
+            "[args-typed] single dash '-' is invalid unless after `--`.",
+            printDescription,
+            fullName
+          );
         } else if (current.startsWith("--")) {
           const eqIndex = current.indexOf("=");
           let longFlag = "";
@@ -573,21 +591,27 @@ class Command<
           }
           if (!(longFlag in self.optionsData)) {
             throw new ParseError(
-              `[args-typed] unknown option --${longFlag} given`
+              `[args-typed] unknown option --${longFlag} given`,
+              printDescription,
+              fullName
             );
           }
           const option = self.optionsData[longFlag]!;
           if (option.type.type === "boolean") {
             if (typeof potentialValue === "string") {
               throw new ParseError(
-                `[args-typed] boolean option --${longFlag} does not take a value`
+                `[args-typed] boolean option --${longFlag} does not take a value`,
+                printDescription,
+                fullName
               );
             }
             if (!allowDuplicateOptions && options[longFlag]) {
               throw new ParseError(
                 `[args-typed] option --${longFlag}${
                   option.short ? ` (-${option.short})` : ""
-                } given multiple times`
+                } given multiple times`,
+                printDescription,
+                fullName
               );
             }
             options[longFlag] = true;
@@ -596,7 +620,9 @@ class Command<
             i++;
             if (i >= args.length) {
               throw new ParseError(
-                `[args-typed] option --${longFlag} requires a value`
+                `[args-typed] option --${longFlag} requires a value`,
+                printDescription,
+                fullName
               );
             }
             if (option.type.type === "list") {
@@ -612,7 +638,9 @@ class Command<
                 throw new ParseError(
                   `[args-typed] option --${longFlag}${
                     option.short ? ` (-${option.short})` : ""
-                  } given multiple times`
+                  } given multiple times`,
+                  printDescription,
+                  fullName
                 );
               }
               options[longFlag] = option.type.parse(args[i]);
@@ -625,7 +653,9 @@ class Command<
             const shortFlag = shortFlags[sfIndex];
             if (!(shortFlag in self.shortOptions)) {
               throw new ParseError(
-                `[args-typed] unknown short option -${shortFlag} given`
+                `[args-typed] unknown short option -${shortFlag} given`,
+                printDescription,
+                fullName
               );
             }
             const longFlag = self.shortOptions[shortFlag]!;
@@ -633,7 +663,9 @@ class Command<
             if (option.type.type === "boolean") {
               if (!allowDuplicateOptions && options[longFlag]) {
                 throw new ParseError(
-                  `[args-typed] option --${longFlag} (-${shortFlag}) given multiple times`
+                  `[args-typed] option --${longFlag} (-${shortFlag}) given multiple times`,
+                  printDescription,
+                  fullName
                 );
               }
               options[longFlag] = true;
@@ -654,7 +686,9 @@ class Command<
                     throw new ParseError(
                       `[args-typed] option --${longFlag}${
                         option.short ? ` (-${option.short})` : ""
-                      } given multiple times`
+                      } given multiple times`,
+                      printDescription,
+                      fullName
                     );
                   }
                   options[longFlag] = option.type.parse(remainingShortFlags);
@@ -663,7 +697,9 @@ class Command<
                 i++;
                 if (i >= args.length) {
                   throw new ParseError(
-                    `[args-typed] option --${longFlag} (-${shortFlag}) requires a value`
+                    `[args-typed] option --${longFlag} (-${shortFlag}) requires a value`,
+                    printDescription,
+                    fullName
                   );
                 }
                 if (option.type.type === "list") {
@@ -679,7 +715,9 @@ class Command<
                     throw new ParseError(
                       `[args-typed] option --${longFlag}${
                         option.short ? ` (-${option.short})` : ""
-                      } given multiple times`
+                      } given multiple times`,
+                      printDescription,
+                      fullName
                     );
                   }
                   options[longFlag] = option.type.parse(args[i]);
@@ -697,7 +735,11 @@ class Command<
             posIndex++;
           } else {
             if (!self.extraPositional) {
-              throw new ParseError("Extra positional argument given");
+              throw new ParseError(
+                "[args-typed] extra positional argument given",
+                printDescription,
+                fullName
+              );
             }
             extra.push(self.extraPositional.parse(current));
           }
@@ -706,7 +748,9 @@ class Command<
 
       if (posIndex < self.requiredPositionalCount) {
         throw new ParseError(
-          `[args-typed] required positional parameters not given`
+          `[args-typed] required positional parameters not given`,
+          printDescription,
+          fullName
         );
       }
 
@@ -962,25 +1006,25 @@ class CommandGroup<
   ): unknown {
     if (short) {
       if (short.length !== 1) {
-        throw new ParseError(
+        throw new ValidationError(
           `[args-typed] short option -${short} must be a single letter`
         );
       }
       if (!(SHORT_ALLOWED as readonly string[]).includes(short)) {
-        throw new ParseError(
+        throw new ValidationError(
           `[args-typed] short option -${short} must be a single letter from ${SHORT_ALLOWED.join(
             ", "
           )}`
         );
       }
       if (short in this.shortOptions) {
-        throw new ParseError(
+        throw new ValidationError(
           `[args-typed] short option -${short} is already defined`
         );
       }
     }
     if (long.length === 0) {
-      throw new ParseError(
+      throw new ValidationError(
         `[args-typed] long option must be a non-empty string`
       );
     }
@@ -989,14 +1033,14 @@ class CommandGroup<
         .split("")
         .find((c) => !(LONG_ALLOWED as readonly string[]).includes(c))
     ) {
-      throw new ParseError(
+      throw new ValidationError(
         `[args-typed] long option --${long} must be a string of letters from ${LONG_ALLOWED.join(
           ", "
         )}`
       );
     }
     if (long in this.optionsData) {
-      throw new ParseError(
+      throw new ValidationError(
         `[args-typed] long option --${long} is already defined`
       );
     }
@@ -1076,14 +1120,20 @@ class CommandGroup<
           i++;
           if (i >= args.length) {
             throw new ParseError(
-              `[args-typed] could not find subcommand after --`
+              `[args-typed] could not find subcommand after --`,
+              printDescription,
+              fullName
             );
           }
           command = args[i];
           i++;
           break;
         } else if (current == "-") {
-          throw new ParseError("Single dash '-' is invalid unless after `--`.");
+          throw new ParseError(
+            "[args-typed] single dash '-' is invalid unless after `--`.",
+            printDescription,
+            fullName
+          );
         } else if (current.startsWith("--")) {
           const eqIndex = current.indexOf("=");
           let longFlag = "";
@@ -1096,21 +1146,27 @@ class CommandGroup<
           }
           if (!(longFlag in self.optionsData)) {
             throw new ParseError(
-              `[args-typed] unknown option --${longFlag} given`
+              `[args-typed] unknown option --${longFlag} given`,
+              printDescription,
+              fullName
             );
           }
           const option = self.optionsData[longFlag]!;
           if (option.type.type === "boolean") {
             if (typeof potentialValue === "string") {
               throw new ParseError(
-                `[args-typed] boolean option --${longFlag} does not take a value`
+                `[args-typed] boolean option --${longFlag} does not take a value`,
+                printDescription,
+                fullName
               );
             }
             if (!allowDuplicateOptions && options[longFlag]) {
               throw new ParseError(
                 `[args-typed] option --${longFlag}${
                   option.short ? ` (-${option.short})` : ""
-                } given multiple times`
+                } given multiple times`,
+                printDescription,
+                fullName
               );
             }
             options[longFlag] = true;
@@ -1119,7 +1175,9 @@ class CommandGroup<
             i++;
             if (i >= args.length) {
               throw new ParseError(
-                `[args-typed] option --${longFlag} requires a value`
+                `[args-typed] option --${longFlag} requires a value`,
+                printDescription,
+                fullName
               );
             }
             if (option.type.type === "list") {
@@ -1135,7 +1193,9 @@ class CommandGroup<
                 throw new ParseError(
                   `[args-typed] option --${longFlag}${
                     option.short ? ` (-${option.short})` : ""
-                  } given multiple times`
+                  } given multiple times`,
+                  printDescription,
+                  fullName
                 );
               }
               options[longFlag] = option.type.parse(args[i]);
@@ -1148,7 +1208,9 @@ class CommandGroup<
             const shortFlag = shortFlags[sfIndex];
             if (!(shortFlag in self.shortOptions)) {
               throw new ParseError(
-                `[args-typed] unknown short option -${shortFlag} given`
+                `[args-typed] unknown short option -${shortFlag} given`,
+                printDescription,
+                fullName
               );
             }
             const longFlag = self.shortOptions[shortFlag]!;
@@ -1156,7 +1218,9 @@ class CommandGroup<
             if (option.type.type === "boolean") {
               if (!allowDuplicateOptions && options[longFlag]) {
                 throw new ParseError(
-                  `[args-typed] option --${longFlag} (-${shortFlag}) given multiple times`
+                  `[args-typed] option --${longFlag} (-${shortFlag}) given multiple times`,
+                  printDescription,
+                  fullName
                 );
               }
               options[longFlag] = true;
@@ -1177,7 +1241,9 @@ class CommandGroup<
                     throw new ParseError(
                       `[args-typed] option --${longFlag}${
                         option.short ? ` (-${option.short})` : ""
-                      } given multiple times`
+                      } given multiple times`,
+                      printDescription,
+                      fullName
                     );
                   }
                   options[longFlag] = option.type.parse(remainingShortFlags);
@@ -1186,7 +1252,9 @@ class CommandGroup<
                 i++;
                 if (i >= args.length) {
                   throw new ParseError(
-                    `[args-typed] option --${longFlag} (-${shortFlag}) requires a value`
+                    `[args-typed] option --${longFlag} (-${shortFlag}) requires a value`,
+                    printDescription,
+                    fullName
                   );
                 }
                 if (option.type.type === "list") {
@@ -1202,7 +1270,9 @@ class CommandGroup<
                     throw new ParseError(
                       `[args-typed] option --${longFlag}${
                         option.short ? ` (-${option.short})` : ""
-                      } given multiple times`
+                      } given multiple times`,
+                      printDescription,
+                      fullName
                     );
                   }
                   options[longFlag] = option.type.parse(args[i]);
@@ -1220,12 +1290,16 @@ class CommandGroup<
 
       if (!command) {
         throw new ParseError(
-          `[args-typed] no subcommand given in group ${fullName}`
+          `[args-typed] no subcommand given in group ${fullName}`,
+          printDescription,
+          fullName
         );
       }
       if (!(command in self.commands)) {
         throw new ParseError(
-          `[args-typed] subcommand ${command} not found in group ${fullName}`
+          `[args-typed] subcommand ${command} not found in group ${fullName}`,
+          printDescription,
+          fullName
         );
       }
 
@@ -1279,11 +1353,25 @@ const LONG_ALLOWED = [...SHORT_ALLOWED, "-"] as const;
 export type { Command, CommandGroup };
 export const command = Command.command;
 export const commandGroup = CommandGroup.commandGroup;
+
 export function run<Context, T>(
   cmd: CommandRegistration<Context, T>,
   args: string[],
   context: Context,
   name: string
-) {
-  return cmd.run(args, context, name, name);
+): T {
+  try {
+    return cmd.run(args, context, name, name);
+  } catch (e) {
+    if (e instanceof ParseError) {
+      e.printDescription(e.fullName);
+      process.exit(
+        e.message === "[args-typed] required positional parameters not given" ||
+          e.message.startsWith("[args-typed] no subcommand given in group ")
+          ? 0
+          : 1
+      );
+    }
+    throw e;
+  }
 }
