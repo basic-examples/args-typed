@@ -228,7 +228,7 @@ class Command<
     short: undefined,
     long: NewLong,
     description: string,
-    type: "boolean"
+    type?: "boolean"
   ): Or<
     [
       UnionToIntersection<NewLong> extends never ? true : false,
@@ -306,7 +306,7 @@ class Command<
     short: NewShort,
     long: NewLong,
     description: string,
-    type: "boolean"
+    type?: "boolean"
   ): Or<
     [
       UnionToIntersection<NewShort> extends never ? true : false,
@@ -389,7 +389,7 @@ class Command<
     short: ShortAllowed | undefined,
     long: string,
     description: string,
-    type: OptionType["type"],
+    type?: OptionType["type"],
     parse?: (value: string) => unknown
   ): unknown {
     if (short) {
@@ -428,6 +428,7 @@ class Command<
     if (long in this.optionsData) {
       throw new Error(`[args-typed] long option --${long} is already defined`);
     }
+    const actualType = type === undefined ? "boolean" : type;
     return new Command(
       this.description,
       this.requiredPositionalCount,
@@ -436,9 +437,9 @@ class Command<
         ...this.optionsData,
         [long]: {
           type:
-            type === "boolean"
-              ? { type }
-              : { type, parse: parse ?? ((value) => value) },
+            actualType === "boolean"
+              ? { type: actualType }
+              : { type: actualType, parse: parse ?? ((value) => value) },
           description,
           short,
         },
@@ -451,14 +452,14 @@ class Command<
         ...this.helpOptions,
         [
           `${short ? `-${short},` : "   "} --${long}${
-            type === "boolean" ? "" : " <value>"
+            actualType === "boolean" ? "" : " <value>"
           }`,
           description,
         ],
       ],
       Math.max(
         this.helpOptionsLongestLeftLength,
-        long.length + 6 + (type === "boolean" ? 0 : 8)
+        long.length + 6 + (actualType === "boolean" ? 0 : 8)
       ),
       this.parseOptions
     );
@@ -896,7 +897,7 @@ class CommandGroup<
     short: undefined,
     long: NewLong,
     description: string,
-    type: "boolean"
+    type?: "boolean"
   ): Or<
     [
       UnionToIntersection<NewLong> extends never ? true : false,
@@ -974,7 +975,7 @@ class CommandGroup<
     short: NewShort,
     long: NewLong,
     description: string,
-    type: "boolean"
+    type?: "boolean"
   ): Or<
     [
       UnionToIntersection<NewShort> extends never ? true : false,
@@ -1057,7 +1058,7 @@ class CommandGroup<
     short: ShortAllowed | undefined,
     long: string,
     description: string,
-    type: OptionType["type"],
+    type?: OptionType["type"],
     parse?: (value: string) => unknown
   ): unknown {
     if (short) {
@@ -1096,6 +1097,7 @@ class CommandGroup<
     if (long in this.optionsData) {
       throw new Error(`[args-typed] long option --${long} is already defined`);
     }
+    const actualType = type === undefined ? "boolean" : type;
     return new CommandGroup(
       this.description,
       this.commands,
@@ -1103,9 +1105,9 @@ class CommandGroup<
         ...this.optionsData,
         [long]: {
           type:
-            type === "boolean"
-              ? { type }
-              : { type, parse: parse ?? ((value) => value) },
+            actualType === "boolean"
+              ? { type: actualType }
+              : { type: actualType, parse: parse ?? ((value) => value) },
           description,
           short,
         },
@@ -1117,14 +1119,14 @@ class CommandGroup<
         ...this.helpOptions,
         [
           `${short ? `-${short},` : "   "} --${long}${
-            type === "boolean" ? "" : " <value>"
+            actualType === "boolean" ? "" : " <value>"
           }`,
           description,
         ],
       ],
       Math.max(
         this.helpOptionsLongestLeftLength,
-        long.length + 6 + (type === "boolean" ? 0 : 8)
+        long.length + 6 + (actualType === "boolean" ? 0 : 8)
       ),
       this.parseOptions
     );

@@ -1,8 +1,7 @@
-# `args-typed` – Type-Safe CLI Argument Parser for JavaScript
+# `args-typed` – Type-Safe CLI Argument Parser
 
-A clean, dependency-free argument parser for JavaScript with full static typing in TypeScript.  
+A clean, dependency-free argument parser with full static typing in TypeScript.  
 Define commands with options, positional arguments, extras, and subcommands—all checked at compile time.
-
 
 ## Why Use `args-typed`?
 
@@ -24,9 +23,9 @@ const rm = command({
   description: "Remove files",
 })
   .extra("files", "Files to remove")
-  .option("h", "help", "Show help", "boolean")
-  .option("f", "force", "Force remove", "boolean")
-  .option("r", "recursive", "Remove recursively", "boolean")
+  .option("h", "help", "Show help")
+  .option("f", "force", "Force remove")
+  .option("r", "recursive", "Remove recursively")
   .option("S", "skip", "Patterns to exclude", "list", parseGlob)
   .build(
     (
@@ -69,7 +68,7 @@ const rm = command({ description: "Remove files" })
   .extra("files", "Files to remove")
   .extra("error", "extra cannot be used multiple times")
   // type error occurs here
-  .option("h", "help", "Show help", "boolean")
+  .option("h", "help", "Show help")
 ```
 
 #### Positional Arguments
@@ -89,12 +88,13 @@ const myRenderer = command({ description: "My own renderer" })
 
 Duplicate names are not allowed. All options are optional.
 
-usage: `option(short?, long, description, type, parse?)`
+usage: `option(short?, long, description, type?, parse?)`
 
 ```ts
 const exec = command({ description: "execute a command with env variables" })
   .option("h", "help", "Show help", "boolean") /* type: boolean/scalar/list */
-  .option(undefined, "dry-run", "Dry run", "boolean") /* optional short form */
+  .option("v", "version", "Show version") /* type="boolean" can be omitted */
+  .option(undefined, "dry-run", "Dry run") /* optional short form */
   .option("e", "env", "Environment variables", "list", parseEnv) /* parse fn */
 ```
 
@@ -120,7 +120,7 @@ Commands, and command groups can be nested in command groups.
 const nested = command({ description: "Nested command" }).build(/* ... */);
 const app = commandGroup({ description: "Main app" })
   .command("nested", nested)
-  .option("h", "help", "Show help", "boolean")
+  .option("h", "help", "Show help")
 ```
 
 ### Extensible Context Handling
@@ -142,7 +142,7 @@ interface AppContext extends GlobalContext {
 const app = commandGroup<AppContext>({
   description: "Main app",
 })
-  .option("h", "help", "Show help", "boolean")
+  .option("h", "help", "Show help")
   .command("subcommand", subcommand) // subcommand's context must be AppContext
   .build<GlobalContext>(({ help }, { context, fullName, printDescription }) => {
     if (help) {

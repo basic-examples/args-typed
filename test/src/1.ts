@@ -14,10 +14,10 @@ const copy = command({
   .positional("source", "The source file")
   .positional("destination", "The destination file", undefined, false)
   .extra("more-destinations", "The destination files")
-  .option("h", "help", "Show help", "boolean")
-  .option("f", "force", "Force overwrite", "boolean")
-  .option("r", "recursive", "Copy recursively", "boolean")
-  .option(undefined, "dry-run", "Dry run", "boolean")
+  .option("h", "help", "Show help")
+  .option("f", "force", "Force overwrite")
+  .option("r", "recursive", "Copy recursively")
+  .option(undefined, "dry-run", "Dry run")
   .build<AppContext, number>(
     (
       [source, destination],
@@ -47,19 +47,19 @@ const echo = command({
   description: "Shell echo replacement",
 })
   .extra("messages", "messages to print")
-  .option("h", "help", "Show help", "boolean")
+  .option("h", "help", "Show help")
   .option(
     "n",
     "no-trailing-newline",
     "Do not print a trailing newline",
     "boolean"
   )
-  .option("e", "escape", "Escape special characters", "boolean")
-  .option("E", "no-escape", "Do not escape special characters", "boolean")
-  .option(undefined, "dump", "Dump parsed arguments", "boolean")
+  .option("e", "escape", "Escape special characters")
+  .option("E", "no-escape", "Do not escape special characters")
+  .option(undefined, "dump", "Dump parsed arguments")
   .option("C", "cwd", "cwd list for expansion for -e", "list")
-  .option("d", "dummy", "Dummy option", "boolean")
-  .option("b", "bool", "Dummy boolean option", "boolean")
+  .option("d", "dummy", "Dummy option")
+  .option("b", "bool", "Dummy boolean option")
   .option("j", "join-with", "Join with", "scalar")
   .build<AppContext, number>(
     (
@@ -102,8 +102,8 @@ const app = commandGroup<AppContext>({
   .command("echo", echo)
   .command("copy", copy)
   .command("cp", copy)
-  .option("v", "version", "Show version", "boolean")
-  .option("h", "help", "Show help", "boolean")
+  .option("v", "version", "Show version")
+  .option("h", "help", "Show help")
   .option("C", "cwd", "change directory", "scalar")
   .build<OuterContext>(
     ({ version, help, cwd }, { name, fullName, printDescription, context }) => {

@@ -15,7 +15,7 @@ const add = command({
 })
   .positional("a", "The first number", parseInt)
   .positional("b", "The second number", parseInt)
-  .option("h", "help", "Show help", "boolean")
+  .option("h", "help", "Show help")
   .build<MathContext>(
     ([a, b], { help }, { context, fullName, printDescription }) => {
       if (context.exit !== undefined) {
@@ -32,7 +32,7 @@ const add = command({
 const math = commandGroup<MathContext>({
   description: "Math",
 })
-  .option("h", "help", "Show help", "boolean")
+  .option("h", "help", "Show help")
   .command("add", add)
   .build<GlobalContext>(({ help }, { context, fullName, printDescription }) => {
     if (help) {
