@@ -5,15 +5,15 @@ Define commands with options, positional arguments, extras, and subcommands—al
 
 ## Why Use `args-typed`?
 
-* **Fully Type-Safe:**
+- **Fully Type-Safe:**
   Arguments, options, extras, and subcommands are all typed at definition.
-* **No Dependencies:**
+- **No Dependencies:**
   Zero runtime dependencies. Lightweight and reliable.
-* **Help Generation:**
+- **Help Generation:**
   Automatically generates descriptions and help messages.
-* **Controlled Execution:**
+- **Controlled Execution:**
   No automatic `process.exit()` — you control behavior explicitly.
-* **Extensible Context:**
+- **Extensible Context:**
   Access metadata like command name and help printer during execution.
 
 ## Example Usage
@@ -41,7 +41,7 @@ const rm = command({
     }
   );
 
-run(rm, process.argv.slice(2), undefined, "rm");
+run(rm, process.argv.slice(2), undefined, "rm", process.exit);
 ```
 
 ## Key Features
@@ -155,7 +155,9 @@ const app = commandGroup<AppContext>({
   });
 
 new Promise<number | undefined>((resolve, reject) =>
-  run(app, process.argv.slice(2), { resolve, reject }, "app")
+  run(app, process.argv.slice(2), { resolve, reject }, "app", (code) => {
+    throw new Error(`Help with code ${code}.`);
+  })
 )
 ```
 

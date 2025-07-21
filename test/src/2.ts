@@ -45,7 +45,7 @@ const math = commandGroup<MathContext>({
   });
 
 new Promise<number | undefined>((resolve, reject) =>
-  run(math, process.argv.slice(2), { resolve, reject }, "math")
+  run(math, process.argv.slice(2), { resolve, reject }, "math", process.exit)
 )
   .then((result) => {
     if (result === undefined) {

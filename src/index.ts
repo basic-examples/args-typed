@@ -1428,14 +1428,15 @@ export function run<Context, T>(
   cmd: CommandRegistration<Context, T>,
   args: string[],
   context: Context,
-  name: string
+  name: string,
+  onHelp: (code: number) => never
 ): T {
   try {
     return cmd.run(args, context, name, name);
   } catch (e) {
     if (e instanceof ParseError) {
       e.printDescription(e.fullName);
-      process.exit(
+      onHelp(
         e.message === "[args-typed] required positional parameters not given" ||
           e.message.startsWith("[args-typed] no subcommand given in group ")
           ? 0

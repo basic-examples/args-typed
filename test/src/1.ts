@@ -120,4 +120,4 @@ const app = commandGroup<AppContext>({
     }
   );
 
-run(app, process.argv.slice(2), { ft: 42 }, "app");
+run(app, process.argv.slice(2), { ft: 42 }, "app", process.exit);
