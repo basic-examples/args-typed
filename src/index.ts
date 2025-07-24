@@ -49,7 +49,7 @@ export interface CommandGroupContext<Context, T> {
   self: (args: string[], context: Context, name: string, fullName: string) => T;
 }
 
-interface CommandRegistration<Context, T> {
+export interface CommandRegistration<Context, T> {
   description: string;
   run: (args: string[], context: Context, name: string, fullName: string) => T;
 }
@@ -540,7 +540,7 @@ class Command<
         self.helpPositional.forEach(([left, right]) =>
           console.log(
             `  ${left}${" ".repeat(
-              self.helpPositionalLongestLeftLength - left.length + 1
+              self.helpPositionalLongestLeftLength - left.length + 2
             )}${right}`
           )
         );
@@ -551,7 +551,7 @@ class Command<
         self.helpOptions.forEach(([left, right]) =>
           console.log(
             `  ${left}${" ".repeat(
-              self.helpOptionsLongestLeftLength - left.length + 1
+              self.helpOptionsLongestLeftLength - left.length + 2
             )}${right}`
           )
         );
@@ -1149,7 +1149,7 @@ class CommandGroup<
       self.helpSubcommands.forEach(([left, right]) =>
         console.log(
           `  ${left}${" ".repeat(
-            self.helpSubcommandsLongestLeftLength - left.length + 1
+            self.helpSubcommandsLongestLeftLength - left.length + 2
           )}${right}`
         )
       );
@@ -1159,7 +1159,7 @@ class CommandGroup<
         self.helpOptions.forEach(([left, right]) =>
           console.log(
             `  ${left}${" ".repeat(
-              self.helpOptionsLongestLeftLength - left.length + 1
+              self.helpOptionsLongestLeftLength - left.length + 2
             )}${right}`
           )
         );

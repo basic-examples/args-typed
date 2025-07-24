@@ -19,6 +19,9 @@ Define commands with options, positional arguments, extras, and subcommands—al
 ## Example Usage
 
 ```ts
+import { command } from "args-typed"; // args parser in pure ts
+import { run } from "args-typed/node"; // nodejs-specific utils
+
 const rm = command({
   description: "Remove files",
 })
@@ -33,15 +36,12 @@ const rm = command({
       { help, force, recursive, skip }, // Typed options
       { fullName, printDescription } // Context
     ) => {
-      if (help) {
-        printDescription(fullName);
-        process.exit(0);
-      }
+      handleHelp(help, printDescription, fullName);
       // Main logic here
     }
   );
 
-run(rm, process.argv.slice(2), undefined, "rm", process.exit);
+run(rm, undefined, "rm");
 ```
 
 ## Key Features

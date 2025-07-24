@@ -1,14 +1,11 @@
 import { run, command, commandGroup } from "args-typed";
-import { exit } from "process";
 
 interface GlobalContext {
-  resolve: (value: number | undefined) => void;
+  resolve: (value: number) => void;
   reject: (reason: unknown) => void;
 }
 
-interface MathContext extends GlobalContext {
-  exit: number | undefined;
-}
+interface MathContext extends GlobalContext {}
 
 const add = command({
   description: "Add two numbers",
@@ -18,12 +15,9 @@ const add = command({
   .option("h", "help", "Show help")
   .build<MathContext>(
     ([a, b], { help }, { context, fullName, printDescription }) => {
-      if (context.exit !== undefined) {
-        context.resolve(undefined);
-      }
       if (help) {
         printDescription(fullName);
-        context.resolve(undefined);
+        throw new Error("Should exit with code 0");
       }
       context.resolve(a + b);
     }
@@ -37,24 +31,29 @@ const math = commandGroup<MathContext>({
   .build<GlobalContext>(({ help }, { context, fullName, printDescription }) => {
     if (help) {
       printDescription(fullName);
+      throw new Error("Should exit with code 0");
     }
     return {
       ...context,
-      exit: help ? 0 : undefined,
     };
   });
 
 new Promise<number | undefined>((resolve, reject) =>
-  run(math, process.argv.slice(2), { resolve, reject }, "math", process.exit)
+  run(math, process.argv.slice(2), { resolve, reject }, "math", (code) => {
+    throw new Error(`Should exit with code ${code}`);
+  })
 )
   .then((result) => {
     if (result === undefined) {
       console.log("No result");
     } else {
-      console.log(result);
+      console.error(result);
     }
   })
   .catch((e) => {
+    if (e.message === "Should exit with code 0") {
+      process.exit(0);
+    }
     console.error(e);
-    exit(1);
+    process.exit(1);
   });

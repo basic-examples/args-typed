@@ -31,8 +31,10 @@ for input_file in data/*/*.in.txt; do
     args+=("$line")
   done < "$input_file"
 
+  set +e
   npx tsx "src/${test_file}.ts" "${args[@]}" >"$output_stdout" 2>"$output_stderr"
   actual_code=$?
+  set -e
 
   expected_code=$([[ -f "$code_file" ]] && cat "$code_file" || echo 0)
   if [ "$actual_code" != "$expected_code" ]; then

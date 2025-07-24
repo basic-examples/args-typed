@@ -3,12 +3,12 @@ Sample app
 Usage: app [options] <subcommand> [subcommand options] [...subcommand arguments]
 
 Subcommands:
-  echo Shell echo replacement
-  copy Copy a file
-  cp   Copy a file
+  echo  Shell echo replacement
+  copy  Copy a file
+  cp    Copy a file
 
 Options:
-  -v, --version     Show version
-  -h, --help        Show help
-  -C, --cwd <value> change directory
+  -v, --version      Show version
+  -h, --help         Show help
+  -C, --cwd <value>  change directory
 
