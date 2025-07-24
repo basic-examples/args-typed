@@ -14,9 +14,9 @@ const add = command({
   .positional("b", "The second number", parseInt)
   .option("h", "help", "Show help")
   .build<MathContext>(
-    ([a, b], { help }, { context, fullName, printDescription }) => {
+    ([a, b], { help }, { context, name, fullName, getHelp }) => {
       if (help) {
-        printDescription(fullName);
+        console.log(getHelp(name, fullName));
         throw new Error("Should exit with code 0");
       }
       context.resolve(a + b);
@@ -28,9 +28,9 @@ const math = commandGroup<MathContext>({
 })
   .option("h", "help", "Show help")
   .command("add", add)
-  .build<GlobalContext>(({ help }, { context, fullName, printDescription }) => {
+  .build<GlobalContext>(({ help }, { context, name, fullName, getHelp }) => {
     if (help) {
-      printDescription(fullName);
+      console.log(getHelp(name, fullName));
       throw new Error("Should exit with code 0");
     }
     return {

@@ -1,6 +1,8 @@
+app version 0.0.0
+
 Sample app
 
-Usage: app [options] <subcommand> [subcommand options] [...subcommand arguments]
+Usage: app [options] <subcommand> [subcommand options] [subcommand arguments]
 
 Subcommands:
   echo  Shell echo replacement

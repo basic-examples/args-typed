@@ -36,7 +36,8 @@ export interface CommandContext<Context, T> {
   fullName: string;
   args: string[];
   context: Context;
-  printDescription: (fullName: string) => void;
+  getHelp: (name: string, fullName: string) => string;
+  getVersion: (name: string) => string | undefined;
   self: (args: string[], context: Context, name: string, fullName: string) => T;
 }
 
@@ -45,7 +46,8 @@ export interface CommandGroupContext<Context, T> {
   fullName: string;
   args: string[];
   context: Context;
-  printDescription: (fullName: string) => void;
+  getHelp: (name: string, fullName: string) => string;
+  getVersion: (name: string) => string | undefined;
   self: (args: string[], context: Context, name: string, fullName: string) => T;
 }
 
@@ -57,8 +59,8 @@ export interface CommandRegistration<Context, T> {
 export class ParseError extends Error {
   constructor(
     message: string,
-    public readonly printDescription: (fullName: string) => void,
-    public readonly fullName: string
+    public readonly help: () => string,
+    public readonly code = 1
   ) {
     super(message);
   }
@@ -84,6 +86,8 @@ class Command<
     private readonly helpPositionalLongestLeftLength: number,
     private readonly helpOptions: [left: string, right: string][],
     private readonly helpOptionsLongestLeftLength: number,
+    private readonly name: string | undefined,
+    private readonly version: string | undefined,
     private readonly parseOptions: {
       allowOptionAfterPositional?: boolean;
       allowDuplicateOptions?: boolean;
@@ -93,10 +97,16 @@ class Command<
 
   public static command({
     description,
+    name,
+    version,
     ...options
   }: {
     description: string;
+    name?: string;
+    version?: string;
     allowOptionAfterPositional?: boolean;
+    allowDuplicateOptions?: boolean;
+    allowSingleDashAsPositional?: boolean;
   }): Command<0, [], {}, {}, never> {
     return new Command(
       description,
@@ -109,6 +119,8 @@ class Command<
       0,
       [],
       0,
+      name,
+      version,
       options
     );
   }
@@ -220,6 +232,8 @@ class Command<
       Math.max(this.helpPositionalLongestLeftLength, name.length + 2),
       this.helpOptions,
       this.helpOptionsLongestLeftLength,
+      this.name,
+      this.version,
       this.parseOptions
     );
   }
@@ -461,6 +475,8 @@ class Command<
         this.helpOptionsLongestLeftLength,
         long.length + 6 + (actualType === "boolean" ? 0 : 8)
       ),
+      this.name,
+      this.version,
       this.parseOptions
     );
   }
@@ -505,6 +521,8 @@ class Command<
       Math.max(this.helpPositionalLongestLeftLength, name.length + 5),
       this.helpOptions,
       this.helpOptionsLongestLeftLength,
+      this.name,
+      this.version,
       this.parseOptions
     );
   }
@@ -521,42 +539,48 @@ class Command<
   ): CommandRegistration<Context, T> {
     const self = this;
 
-    function printDescription(fullName: string) {
-      console.log(`${self.description}\n`);
-      console.log(
-        `Usage: ${fullName} [options]${self.positionalData
-          .map(
-            ({ name }, i) =>
-              ` ${i < self.requiredPositionalCount ? "<" : "["}${name}${
-                i < self.requiredPositionalCount ? ">" : "]"
-              }`
-          )
-          .join("")}${
-          self.extraPositional ? ` [...${self.extraPositional.name}]` : ""
-        }\n`
-      );
-      if (self.helpPositional.length > 0) {
-        console.log("Positional parameters:");
-        self.helpPositional.forEach(([left, right]) =>
-          console.log(
-            `  ${left}${" ".repeat(
-              self.helpPositionalLongestLeftLength - left.length + 2
-            )}${right}`
-          )
-        );
-      }
-      console.log("");
-      if (Object.keys(self.optionsData).length > 0) {
-        console.log("Options:");
-        self.helpOptions.forEach(([left, right]) =>
-          console.log(
-            `  ${left}${" ".repeat(
-              self.helpOptionsLongestLeftLength - left.length + 2
-            )}${right}`
-          )
-        );
-        console.log("");
-      }
+    function getVersion(name: string): string | undefined {
+      return self.version === undefined
+        ? undefined
+        : `${self.name ?? name} version ${self.version}`;
+    }
+
+    function getHelp(name: string, fullName: string): string {
+      const version = getVersion(name);
+      return `${version ? `${version}\n\n` : ""}${
+        self.description === undefined ? "" : `${self.description}\n\n`
+      }Usage: ${fullName} [options]${self.positionalData
+        .map(
+          ({ name }, i) =>
+            ` ${i < self.requiredPositionalCount ? "<" : "["}${name}${
+              i < self.requiredPositionalCount ? ">" : "]"
+            }`
+        )
+        .join("")}${
+        self.extraPositional ? ` [...${self.extraPositional.name}]` : ""
+      }\n${
+        self.helpPositional.length > 0
+          ? `\nPositional parameters:\n${self.helpPositional
+              .map(
+                ([left, right]) =>
+                  `  ${left}${" ".repeat(
+                    self.helpPositionalLongestLeftLength - left.length + 2
+                  )}${right}\n`
+              )
+              .join("")}`
+          : ""
+      }${
+        self.helpOptions.length > 0
+          ? `\nOptions:\n${self.helpOptions
+              .map(
+                ([left, right]) =>
+                  `  ${left}${" ".repeat(
+                    self.helpOptionsLongestLeftLength - left.length + 2
+                  )}${right}\n`
+              )
+              .join("")}`
+          : ""
+      }`;
     }
 
     function run(
@@ -574,6 +598,8 @@ class Command<
       const options: any = {};
       const extra: any[] = [];
 
+      const help = () => getHelp(name, fullName);
+
       let posIndex = 0;
       let parsingFlag = true;
 
@@ -589,8 +615,7 @@ class Command<
             if (!self.extraPositional) {
               throw new ParseError(
                 "[args-typed] extra positional argument given",
-                printDescription,
-                fullName
+                help
               );
             }
             extra.push(self.extraPositional.parse(current));
@@ -600,8 +625,7 @@ class Command<
           if (!allowSingleDashAsPositional) {
             throw new ParseError(
               "[args-typed] single dash '-' is invalid unless after `--`.",
-              printDescription,
-              fullName
+              help
             );
           }
           // TODO: reduce code duplication
@@ -615,8 +639,7 @@ class Command<
             if (!self.extraPositional) {
               throw new ParseError(
                 "[args-typed] extra positional argument given",
-                printDescription,
-                fullName
+                help
               );
             }
             extra.push(self.extraPositional.parse(current));
@@ -634,8 +657,7 @@ class Command<
           if (!(longFlag in self.optionsData)) {
             throw new ParseError(
               `[args-typed] unknown option --${longFlag} given`,
-              printDescription,
-              fullName
+              help
             );
           }
           const option = self.optionsData[longFlag]!;
@@ -643,8 +665,7 @@ class Command<
             if (typeof potentialValue === "string") {
               throw new ParseError(
                 `[args-typed] boolean option --${longFlag} does not take a value`,
-                printDescription,
-                fullName
+                help
               );
             }
             if (!allowDuplicateOptions && options[longFlag]) {
@@ -652,8 +673,7 @@ class Command<
                 `[args-typed] option --${longFlag}${
                   option.short ? ` (-${option.short})` : ""
                 } given multiple times`,
-                printDescription,
-                fullName
+                help
               );
             }
             options[longFlag] = true;
@@ -663,8 +683,7 @@ class Command<
             if (i >= args.length) {
               throw new ParseError(
                 `[args-typed] option --${longFlag} requires a value`,
-                printDescription,
-                fullName
+                help
               );
             }
             if (option.type.type === "list") {
@@ -681,8 +700,7 @@ class Command<
                   `[args-typed] option --${longFlag}${
                     option.short ? ` (-${option.short})` : ""
                   } given multiple times`,
-                  printDescription,
-                  fullName
+                  help
                 );
               }
               options[longFlag] = option.type.parse(args[i]);
@@ -696,8 +714,7 @@ class Command<
             if (!(shortFlag in self.shortOptions)) {
               throw new ParseError(
                 `[args-typed] unknown short option -${shortFlag} given`,
-                printDescription,
-                fullName
+                help
               );
             }
             const longFlag = self.shortOptions[shortFlag]!;
@@ -706,8 +723,7 @@ class Command<
               if (!allowDuplicateOptions && options[longFlag]) {
                 throw new ParseError(
                   `[args-typed] option --${longFlag} (-${shortFlag}) given multiple times`,
-                  printDescription,
-                  fullName
+                  help
                 );
               }
               options[longFlag] = true;
@@ -729,8 +745,7 @@ class Command<
                       `[args-typed] option --${longFlag}${
                         option.short ? ` (-${option.short})` : ""
                       } given multiple times`,
-                      printDescription,
-                      fullName
+                      help
                     );
                   }
                   options[longFlag] = option.type.parse(remainingShortFlags);
@@ -740,8 +755,7 @@ class Command<
                 if (i >= args.length) {
                   throw new ParseError(
                     `[args-typed] option --${longFlag} (-${shortFlag}) requires a value`,
-                    printDescription,
-                    fullName
+                    help
                   );
                 }
                 if (option.type.type === "list") {
@@ -758,8 +772,7 @@ class Command<
                       `[args-typed] option --${longFlag}${
                         option.short ? ` (-${option.short})` : ""
                       } given multiple times`,
-                      printDescription,
-                      fullName
+                      help
                     );
                   }
                   options[longFlag] = option.type.parse(args[i]);
@@ -779,8 +792,7 @@ class Command<
             if (!self.extraPositional) {
               throw new ParseError(
                 "[args-typed] extra positional argument given",
-                printDescription,
-                fullName
+                help
               );
             }
             extra.push(self.extraPositional.parse(current));
@@ -791,8 +803,8 @@ class Command<
       if (posIndex < self.requiredPositionalCount) {
         throw new ParseError(
           `[args-typed] required positional parameters not given`,
-          printDescription,
-          fullName
+          help,
+          0
         );
       }
 
@@ -801,7 +813,8 @@ class Command<
         fullName,
         args,
         context,
-        printDescription,
+        getHelp,
+        getVersion,
         self: run,
       });
     }
@@ -831,6 +844,8 @@ class CommandGroup<
     private readonly helpSubcommandsLongestLeftLength: number,
     private readonly helpOptions: [left: string, right: string][],
     private readonly helpOptionsLongestLeftLength: number,
+    private readonly name: string | undefined,
+    private readonly version: string | undefined,
     private readonly parseOptions: {
       allowDuplicateOptions?: boolean;
       allowSingleDashAsPositional?: boolean;
@@ -839,12 +854,29 @@ class CommandGroup<
 
   public static commandGroup<InnerContext, T = never>({
     description,
+    name,
+    version,
     ...options
   }: {
     description: string;
+    name?: string;
+    version?: string;
     allowDuplicateOptions?: boolean;
+    allowSingleDashAsPositional?: boolean;
   }): CommandGroup<{}, {}, {}, InnerContext, T> {
-    return new CommandGroup(description, {}, {}, {}, [], 0, [], 0, options);
+    return new CommandGroup(
+      description,
+      {},
+      {},
+      {},
+      [],
+      0,
+      [],
+      0,
+      name,
+      version,
+      options
+    );
   }
 
   public command<const Name extends string, T2>(
@@ -889,6 +921,8 @@ class CommandGroup<
       Math.max(this.helpSubcommandsLongestLeftLength, name.length),
       this.helpOptions,
       this.helpOptionsLongestLeftLength,
+      this.name,
+      this.version,
       this.parseOptions
     );
   }
@@ -1128,6 +1162,8 @@ class CommandGroup<
         this.helpOptionsLongestLeftLength,
         long.length + 6 + (actualType === "boolean" ? 0 : 8)
       ),
+      this.name,
+      this.version,
       this.parseOptions
     );
   }
@@ -1140,31 +1176,35 @@ class CommandGroup<
   ): CommandRegistration<OuterContext, Result> {
     const self = this;
 
-    function printDescription(fullName: string) {
-      console.log(`${self.description}\n`);
-      console.log(
-        `Usage: ${fullName} [options] <subcommand> [subcommand options] [...subcommand arguments]\n`
-      );
-      console.log("Subcommands:");
-      self.helpSubcommands.forEach(([left, right]) =>
-        console.log(
-          `  ${left}${" ".repeat(
-            self.helpSubcommandsLongestLeftLength - left.length + 2
-          )}${right}`
-        )
-      );
-      console.log("");
-      if (Object.keys(self.optionsData).length > 0) {
-        console.log("Options:");
-        self.helpOptions.forEach(([left, right]) =>
-          console.log(
+    function getVersion(name: string): string | undefined {
+      return self.version === undefined
+        ? undefined
+        : `${self.name ?? name} version ${self.version}`;
+    }
+
+    function getHelp(name: string, fullName: string): string {
+      const version = getVersion(name);
+      return `${version ? `${version}\n\n` : ""}${
+        self.description === undefined ? "" : `${self.description}\n\n`
+      }Usage: ${fullName} [options] <subcommand> [subcommand options] [subcommand arguments]\n\nSubcommands:\n${self.helpSubcommands
+        .map(
+          ([left, right]) =>
             `  ${left}${" ".repeat(
-              self.helpOptionsLongestLeftLength - left.length + 2
-            )}${right}`
-          )
-        );
-        console.log("");
-      }
+              self.helpSubcommandsLongestLeftLength - left.length + 2
+            )}${right}\n`
+        )
+        .join("")}${
+        self.helpOptions.length > 0
+          ? `\nOptions:\n${self.helpOptions
+              .map(
+                ([left, right]) =>
+                  `  ${left}${" ".repeat(
+                    self.helpOptionsLongestLeftLength - left.length + 2
+                  )}${right}\n`
+              )
+              .join("")}`
+          : ""
+      }`;
     }
 
     function run(
@@ -1176,6 +1216,8 @@ class CommandGroup<
       const { allowDuplicateOptions, allowSingleDashAsPositional } =
         self.parseOptions;
       const options: any = {};
+      const help = () => getHelp(name, fullName);
+
       let command: string | undefined;
       let i = 0;
 
@@ -1186,8 +1228,7 @@ class CommandGroup<
           if (i >= args.length) {
             throw new ParseError(
               `[args-typed] could not find subcommand after --`,
-              printDescription,
-              fullName
+              help
             );
           }
           command = args[i];
@@ -1197,8 +1238,7 @@ class CommandGroup<
           if (!allowSingleDashAsPositional) {
             throw new ParseError(
               "[args-typed] single dash '-' is invalid unless after `--`.",
-              printDescription,
-              fullName
+              help
             );
           }
           command = current;
@@ -1217,8 +1257,7 @@ class CommandGroup<
           if (!(longFlag in self.optionsData)) {
             throw new ParseError(
               `[args-typed] unknown option --${longFlag} given`,
-              printDescription,
-              fullName
+              help
             );
           }
           const option = self.optionsData[longFlag]!;
@@ -1226,8 +1265,7 @@ class CommandGroup<
             if (typeof potentialValue === "string") {
               throw new ParseError(
                 `[args-typed] boolean option --${longFlag} does not take a value`,
-                printDescription,
-                fullName
+                help
               );
             }
             if (!allowDuplicateOptions && options[longFlag]) {
@@ -1235,8 +1273,7 @@ class CommandGroup<
                 `[args-typed] option --${longFlag}${
                   option.short ? ` (-${option.short})` : ""
                 } given multiple times`,
-                printDescription,
-                fullName
+                help
               );
             }
             options[longFlag] = true;
@@ -1246,8 +1283,7 @@ class CommandGroup<
             if (i >= args.length) {
               throw new ParseError(
                 `[args-typed] option --${longFlag} requires a value`,
-                printDescription,
-                fullName
+                help
               );
             }
             if (option.type.type === "list") {
@@ -1264,8 +1300,7 @@ class CommandGroup<
                   `[args-typed] option --${longFlag}${
                     option.short ? ` (-${option.short})` : ""
                   } given multiple times`,
-                  printDescription,
-                  fullName
+                  help
                 );
               }
               options[longFlag] = option.type.parse(args[i]);
@@ -1279,8 +1314,7 @@ class CommandGroup<
             if (!(shortFlag in self.shortOptions)) {
               throw new ParseError(
                 `[args-typed] unknown short option -${shortFlag} given`,
-                printDescription,
-                fullName
+                help
               );
             }
             const longFlag = self.shortOptions[shortFlag]!;
@@ -1289,8 +1323,7 @@ class CommandGroup<
               if (!allowDuplicateOptions && options[longFlag]) {
                 throw new ParseError(
                   `[args-typed] option --${longFlag} (-${shortFlag}) given multiple times`,
-                  printDescription,
-                  fullName
+                  help
                 );
               }
               options[longFlag] = true;
@@ -1312,8 +1345,7 @@ class CommandGroup<
                       `[args-typed] option --${longFlag}${
                         option.short ? ` (-${option.short})` : ""
                       } given multiple times`,
-                      printDescription,
-                      fullName
+                      help
                     );
                   }
                   options[longFlag] = option.type.parse(remainingShortFlags);
@@ -1323,8 +1355,7 @@ class CommandGroup<
                 if (i >= args.length) {
                   throw new ParseError(
                     `[args-typed] option --${longFlag} (-${shortFlag}) requires a value`,
-                    printDescription,
-                    fullName
+                    help
                   );
                 }
                 if (option.type.type === "list") {
@@ -1341,8 +1372,7 @@ class CommandGroup<
                       `[args-typed] option --${longFlag}${
                         option.short ? ` (-${option.short})` : ""
                       } given multiple times`,
-                      printDescription,
-                      fullName
+                      help
                     );
                   }
                   options[longFlag] = option.type.parse(args[i]);
@@ -1361,15 +1391,14 @@ class CommandGroup<
       if (!command) {
         throw new ParseError(
           `[args-typed] no subcommand given in group ${fullName}`,
-          printDescription,
-          fullName
+          help,
+          0
         );
       }
       if (!(command in self.commands)) {
         throw new ParseError(
           `[args-typed] subcommand ${command} not found in group ${fullName}`,
-          printDescription,
-          fullName
+          help
         );
       }
 
@@ -1379,7 +1408,8 @@ class CommandGroup<
         fullName,
         args: sliced,
         context,
-        printDescription,
+        getHelp,
+        getVersion,
         self: run,
       });
       return self.commands[command]!.run(
@@ -1435,13 +1465,8 @@ export function run<Context, T>(
     return cmd.run(args, context, name, name);
   } catch (e) {
     if (e instanceof ParseError) {
-      e.printDescription(e.fullName);
-      onHelp(
-        e.message === "[args-typed] required positional parameters not given" ||
-          e.message.startsWith("[args-typed] no subcommand given in group ")
-          ? 0
-          : 1
-      );
+      console.log(e.help());
+      onHelp(e.code);
     }
     throw e;
   }

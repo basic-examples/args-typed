@@ -1,5 +1,5 @@
 import { command, commandGroup } from "args-typed";
-import { handleHelp, run } from "args-typed/node";
+import { handleHelp, handleVersionAndHelp, run } from "args-typed/node";
 
 interface OuterContext {
   ft: number;
@@ -23,9 +23,9 @@ const copy = command({
     (
       [source, destination],
       { help, force, recursive, "dry-run": dryRun },
-      { fullName, printDescription }
+      { name, fullName, getHelp }
     ) => {
-      handleHelp(help, printDescription, fullName);
+      handleHelp(help, getHelp, name, fullName);
       console.log(
         `Copying ${source} to ${destination}${
           force || recursive
@@ -73,9 +73,9 @@ const echo = command({
         bool,
         "join-with": j,
       },
-      { fullName, printDescription }
+      { name, fullName, getHelp }
     ) => {
-      handleHelp(help, printDescription, fullName);
+      handleHelp(help, getHelp, name, fullName);
       if (escape && E) {
         console.error("Cannot use both -e and -E");
         process.exit(1);
@@ -93,6 +93,7 @@ const echo = command({
   );
 
 const app = commandGroup<AppContext>({
+  version: "0.0.0",
   description: "Sample app",
 })
   .command("echo", echo)
@@ -101,15 +102,9 @@ const app = commandGroup<AppContext>({
   .option("v", "version", "Show version")
   .option("h", "help", "Show help")
   .option("C", "cwd", "change directory", "scalar")
-  .build<OuterContext>(
-    ({ version, help, cwd }, { name, fullName, printDescription, context }) => {
-      handleHelp(help, printDescription, fullName);
-      if (version) {
-        console.log(`${name} version 0.0.0`);
-        process.exit(0);
-      }
-      return { ...context, cwd };
-    }
-  );
+  .build<OuterContext>((args, context) => {
+    handleVersionAndHelp(args, context);
+    return { ...context.context, cwd: args.cwd };
+  });
 
 run(app, { ft: 42 }, "app");

@@ -1,6 +1,6 @@
 Math
 
-Usage: math [options] <subcommand> [subcommand options] [...subcommand arguments]
+Usage: math [options] <subcommand> [subcommand options] [subcommand arguments]
 
 Subcommands:
   add  Add two numbers
