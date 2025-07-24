@@ -42,8 +42,6 @@ for input_file in data/*/*.in.txt; do
     EXIT_CODE=1
   fi
 
-  cp "$output_stdout" "$stdout_file"
-
   if ! diff "$output_stdout" <([[ -f "$stdout_file" ]] && cat "$stdout_file" || printf ""); then
     echo "Stdout mismatch in $input_file"
     EXIT_CODE=1

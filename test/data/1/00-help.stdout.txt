@@ -10,7 +10,7 @@ Subcommands:
   cp    Copy a file
 
 Options:
-  -v, --version      Show version
   -h, --help         Show help
+  -v, --version      Show version
   -C, --cwd <value>  change directory
 

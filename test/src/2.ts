@@ -9,40 +9,44 @@ interface MathContext extends GlobalContext {}
 
 const add = command({
   description: "Add two numbers",
+  enableHelp: true,
 })
   .positional("a", "The first number", parseInt)
   .positional("b", "The second number", parseInt)
-  .option("h", "help", "Show help")
-  .build<MathContext>(
-    ([a, b], { help }, { context, name, fullName, getHelp }) => {
-      if (help) {
-        console.log(getHelp(name, fullName));
-        throw new Error("Should exit with code 0");
-      }
-      context.resolve(a + b);
-    }
-  );
+  .build<MathContext>(([a, b], _, { context }) => {
+    context.resolve(a + b);
+  });
 
 const math = commandGroup<MathContext>({
   description: "Math",
+  enableHelp: true,
 })
-  .option("h", "help", "Show help")
   .command("add", add)
-  .build<GlobalContext>(({ help }, { context, name, fullName, getHelp }) => {
-    if (help) {
-      console.log(getHelp(name, fullName));
-      throw new Error("Should exit with code 0");
-    }
-    return {
-      ...context,
-    };
-  });
+  .build<GlobalContext>((_, { context }) => context);
 
-new Promise<number | undefined>((resolve, reject) =>
-  run(math, process.argv.slice(2), { resolve, reject }, "math", (code) => {
-    throw new Error(`Should exit with code ${code}`);
-  })
-)
+new Promise<number | undefined>((resolve, reject) => {
+  function onError(message: string): never {
+    console.log(message);
+    throw new Error("Should exit with code 1");
+  }
+
+  function onHelpOrVersion(message: string | undefined): never {
+    if (message !== undefined) {
+      console.log(message);
+    }
+    throw new Error("Should exit with code 0");
+  }
+
+  return run(
+    math,
+    process.argv.slice(2),
+    { resolve, reject },
+    "math",
+    onError,
+    onHelpOrVersion,
+    onHelpOrVersion
+  );
+})
   .then((result) => {
     if (result === undefined) {
       console.log("No result");
@@ -53,7 +57,7 @@ new Promise<number | undefined>((resolve, reject) =>
   .catch((e) => {
     if (e.message === "Should exit with code 0") {
       process.exit(0);
+    } else {
+      process.exit(1);
     }
-    console.error(e);
-    process.exit(1);
   });

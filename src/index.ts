@@ -38,7 +38,14 @@ export interface CommandContext<Context, T> {
   context: Context;
   getHelp: (name: string, fullName: string) => string;
   getVersion: (name: string) => string | undefined;
-  self: (args: string[], context: Context, name: string, fullName: string) => T;
+  run: (
+    args: string[],
+    context: Context,
+    name: string,
+    fullName: string,
+    onHelp: (message: string) => never,
+    onVersion: (message: string | undefined) => never
+  ) => T;
 }
 
 export interface CommandGroupContext<Context, T> {
@@ -48,20 +55,30 @@ export interface CommandGroupContext<Context, T> {
   context: Context;
   getHelp: (name: string, fullName: string) => string;
   getVersion: (name: string) => string | undefined;
-  self: (args: string[], context: Context, name: string, fullName: string) => T;
+  run: (
+    args: string[],
+    context: Context,
+    name: string,
+    fullName: string,
+    onHelp: (message: string) => never,
+    onVersion: (message: string | undefined) => never
+  ) => T;
 }
 
 export interface CommandRegistration<Context, T> {
   description: string;
-  run: (args: string[], context: Context, name: string, fullName: string) => T;
+  run: (
+    args: string[],
+    context: Context,
+    name: string,
+    fullName: string,
+    onHelp: (message: string) => never,
+    onVersion: (message: string | undefined) => never
+  ) => T;
 }
 
 export class ParseError extends Error {
-  constructor(
-    message: string,
-    public readonly help: () => string,
-    public readonly code = 1
-  ) {
+  constructor(message: string, public readonly help: () => string) {
     super(message);
   }
 }
@@ -88,6 +105,8 @@ class Command<
     private readonly helpOptionsLongestLeftLength: number,
     private readonly name: string | undefined,
     private readonly version: string | undefined,
+    private readonly enableHelp: true | undefined,
+    private readonly enableVersion: true | undefined,
     private readonly parseOptions: {
       allowOptionAfterPositional?: boolean;
       allowDuplicateOptions?: boolean;
@@ -95,20 +114,78 @@ class Command<
     }
   ) {}
 
-  public static command({
-    description,
-    name,
-    version,
-    ...options
-  }: {
+  public static command(options: {
     description: string;
     name?: string;
     version?: string;
     allowOptionAfterPositional?: boolean;
     allowDuplicateOptions?: boolean;
     allowSingleDashAsPositional?: boolean;
-  }): Command<0, [], {}, {}, never> {
-    return new Command(
+  }): Command<0, [], {}, {}, never>;
+  public static command(options: {
+    description: string;
+    name?: string;
+    version?: string;
+    enableHelp: true;
+    allowOptionAfterPositional?: boolean;
+    allowDuplicateOptions?: boolean;
+    allowSingleDashAsPositional?: boolean;
+  }): Command<
+    0,
+    [],
+    Record<"help", { type: "boolean" }>,
+    Record<"h", "help">,
+    never
+  >;
+  public static command(options: {
+    description: string;
+    name?: string;
+    version?: string;
+    enableVersion: true;
+    allowOptionAfterPositional?: boolean;
+    allowDuplicateOptions?: boolean;
+    allowSingleDashAsPositional?: boolean;
+  }): Command<
+    0,
+    [],
+    Record<"version", { type: "boolean" }>,
+    Record<"v", "version">,
+    never
+  >;
+  public static command(options: {
+    description: string;
+    name?: string;
+    version?: string;
+    enableHelp: true;
+    enableVersion: true;
+    allowOptionAfterPositional?: boolean;
+    allowDuplicateOptions?: boolean;
+    allowSingleDashAsPositional?: boolean;
+  }): Command<
+    0,
+    [],
+    { version: { type: "boolean" }; help: { type: "boolean" } },
+    { v: "version"; h: "help" },
+    never
+  >;
+  public static command({
+    description,
+    name,
+    version,
+    enableHelp,
+    enableVersion,
+    ...options
+  }: {
+    description: string;
+    name?: string;
+    version?: string;
+    enableHelp?: true;
+    enableVersion?: true;
+    allowOptionAfterPositional?: boolean;
+    allowDuplicateOptions?: boolean;
+    allowSingleDashAsPositional?: boolean;
+  }) {
+    const base = new Command<0, [], {}, {}, never>(
       description,
       0,
       [],
@@ -121,8 +198,21 @@ class Command<
       0,
       name,
       version,
+      enableHelp,
+      enableVersion,
       options
     );
+    if (enableHelp && enableVersion) {
+      return base
+        .option("h", "help", "Show help")
+        .option("v", "version", "Show version");
+    } else if (enableHelp) {
+      return base.option("h", "help", "Show help");
+    } else if (enableVersion) {
+      return base.option("v", "version", "Show version");
+    } else {
+      return base;
+    }
   }
 
   public positional(
@@ -234,6 +324,8 @@ class Command<
       this.helpOptionsLongestLeftLength,
       this.name,
       this.version,
+      this.enableHelp,
+      this.enableVersion,
       this.parseOptions
     );
   }
@@ -477,6 +569,8 @@ class Command<
       ),
       this.name,
       this.version,
+      this.enableHelp,
+      this.enableVersion,
       this.parseOptions
     );
   }
@@ -523,6 +617,8 @@ class Command<
       this.helpOptionsLongestLeftLength,
       this.name,
       this.version,
+      this.enableHelp,
+      this.enableVersion,
       this.parseOptions
     );
   }
@@ -587,7 +683,9 @@ class Command<
       args: string[],
       context: Context,
       name: string,
-      fullName: string
+      fullName: string,
+      onHelp: (message: string) => never,
+      onVersion: (message: string | undefined) => never
     ): T {
       const {
         allowOptionAfterPositional,
@@ -800,11 +898,17 @@ class Command<
         }
       }
 
+      if (self.enableHelp && options.help) {
+        onHelp(getHelp(name, fullName));
+      }
+      if (self.enableVersion && options.version) {
+        onVersion(getVersion(name));
+      }
+
       if (posIndex < self.requiredPositionalCount) {
         throw new ParseError(
           `[args-typed] required positional parameters not given`,
-          help,
-          0
+          help
         );
       }
 
@@ -815,7 +919,7 @@ class Command<
         context,
         getHelp,
         getVersion,
-        self: run,
+        run: run,
       });
     }
 
@@ -846,25 +950,81 @@ class CommandGroup<
     private readonly helpOptionsLongestLeftLength: number,
     private readonly name: string | undefined,
     private readonly version: string | undefined,
+    private readonly enableHelp: true | undefined,
+    private readonly enableVersion: true | undefined,
     private readonly parseOptions: {
       allowDuplicateOptions?: boolean;
       allowSingleDashAsPositional?: boolean;
     }
   ) {}
 
-  public static commandGroup<InnerContext, T = never>({
-    description,
-    name,
-    version,
-    ...options
-  }: {
+  public static commandGroup<InnerContext, T = never>(options: {
     description: string;
     name?: string;
     version?: string;
     allowDuplicateOptions?: boolean;
     allowSingleDashAsPositional?: boolean;
-  }): CommandGroup<{}, {}, {}, InnerContext, T> {
-    return new CommandGroup(
+  }): CommandGroup<{}, {}, {}, InnerContext, T>;
+  public static commandGroup<InnerContext, T = never>(options: {
+    description: string;
+    name?: string;
+    version?: string;
+    enableHelp: true;
+    allowDuplicateOptions?: boolean;
+    allowSingleDashAsPositional?: boolean;
+  }): CommandGroup<
+    {},
+    Record<"help", { type: "boolean" }>,
+    Record<"h", "help">,
+    InnerContext,
+    T
+  >;
+  public static commandGroup<InnerContext, T = never>(options: {
+    description: string;
+    name?: string;
+    version?: string;
+    enableVersion: true;
+    allowDuplicateOptions?: boolean;
+    allowSingleDashAsPositional?: boolean;
+  }): CommandGroup<
+    {},
+    Record<"version", { type: "boolean" }>,
+    Record<"v", "version">,
+    InnerContext,
+    T
+  >;
+  public static commandGroup<InnerContext, T = never>(options: {
+    description: string;
+    name?: string;
+    version?: string;
+    enableHelp: true;
+    enableVersion: true;
+    allowDuplicateOptions?: boolean;
+    allowSingleDashAsPositional?: boolean;
+  }): CommandGroup<
+    {},
+    { version: { type: "boolean" }; help: { type: "boolean" } },
+    { v: "version"; h: "help" },
+    InnerContext,
+    T
+  >;
+  public static commandGroup<InnerContext, T = never>({
+    description,
+    name,
+    version,
+    enableHelp,
+    enableVersion,
+    ...options
+  }: {
+    description: string;
+    name?: string;
+    version?: string;
+    enableHelp?: true;
+    enableVersion?: true;
+    allowDuplicateOptions?: boolean;
+    allowSingleDashAsPositional?: boolean;
+  }) {
+    const base = new CommandGroup<{}, {}, {}, InnerContext, T>(
       description,
       {},
       {},
@@ -875,8 +1035,21 @@ class CommandGroup<
       0,
       name,
       version,
+      enableHelp,
+      enableVersion,
       options
     );
+    if (enableHelp && enableVersion) {
+      return base
+        .option("h", "help", "Show help")
+        .option("v", "version", "Show version");
+    } else if (enableHelp) {
+      return base.option("h", "help", "Show help");
+    } else if (enableVersion) {
+      return base.option("v", "version", "Show version");
+    } else {
+      return base;
+    }
   }
 
   public command<const Name extends string, T2>(
@@ -923,6 +1096,8 @@ class CommandGroup<
       this.helpOptionsLongestLeftLength,
       this.name,
       this.version,
+      this.enableHelp,
+      this.enableVersion,
       this.parseOptions
     );
   }
@@ -1164,6 +1339,8 @@ class CommandGroup<
       ),
       this.name,
       this.version,
+      this.enableHelp,
+      this.enableVersion,
       this.parseOptions
     );
   }
@@ -1211,7 +1388,9 @@ class CommandGroup<
       args: string[],
       context: OuterContext,
       name: string,
-      fullName: string
+      fullName: string,
+      onHelp: (message: string) => never,
+      onVersion: (message: string | undefined) => never
     ): Result {
       const { allowDuplicateOptions, allowSingleDashAsPositional } =
         self.parseOptions;
@@ -1388,11 +1567,17 @@ class CommandGroup<
         }
       }
 
+      if (self.enableHelp && options.help) {
+        onHelp(getHelp(name, fullName));
+      }
+      if (self.enableVersion && options.version) {
+        onVersion(getVersion(name));
+      }
+
       if (!command) {
         throw new ParseError(
           `[args-typed] no subcommand given in group ${fullName}`,
-          help,
-          0
+          help
         );
       }
       if (!(command in self.commands)) {
@@ -1410,13 +1595,15 @@ class CommandGroup<
         context,
         getHelp,
         getVersion,
-        self: run,
+        run: run,
       });
       return self.commands[command]!.run(
         sliced,
         innerContext,
         command,
-        `${fullName} ${command}`
+        `${fullName} ${command}`,
+        onHelp,
+        onVersion
       );
     }
 
@@ -1459,14 +1646,15 @@ export function run<Context, T>(
   args: string[],
   context: Context,
   name: string,
-  onHelp: (code: number) => never
+  onError: (message: string) => never,
+  onHelp: (message: string) => never,
+  onVersion: (message: string | undefined) => never
 ): T {
   try {
-    return cmd.run(args, context, name, name);
+    return cmd.run(args, context, name, name, onHelp, onVersion);
   } catch (e) {
     if (e instanceof ParseError) {
-      console.log(e.help());
-      onHelp(e.code);
+      onError(e.help());
     }
     throw e;
   }
