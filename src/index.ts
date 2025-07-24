@@ -66,7 +66,7 @@ export interface CommandGroupContext<Context, T> {
 }
 
 export interface CommandRegistration<Context, T> {
-  description: string;
+  description: string | undefined;
   run: (
     args: string[],
     context: Context,
@@ -91,7 +91,7 @@ class Command<
   const ExtraPositional
 > {
   private constructor(
-    private readonly description: string,
+    private readonly description: string | undefined,
     private readonly requiredPositionalCount: RequiredPositionalCount,
     private readonly positionalData: PositionalData[],
     private readonly optionsData: Partial<Record<string, OptionData>>,
@@ -114,8 +114,8 @@ class Command<
     }
   ) {}
 
-  public static command(options: {
-    description: string;
+  public static command(options?: {
+    description?: string;
     name?: string;
     version?: string;
     allowOptionAfterPositional?: boolean;
@@ -123,7 +123,7 @@ class Command<
     allowSingleDashAsPositional?: boolean;
   }): Command<0, [], {}, {}, never>;
   public static command(options: {
-    description: string;
+    description?: string;
     name?: string;
     version?: string;
     enableHelp: true;
@@ -138,7 +138,7 @@ class Command<
     never
   >;
   public static command(options: {
-    description: string;
+    description?: string;
     name?: string;
     version?: string;
     enableVersion: true;
@@ -153,7 +153,7 @@ class Command<
     never
   >;
   public static command(options: {
-    description: string;
+    description?: string;
     name?: string;
     version?: string;
     enableHelp: true;
@@ -176,7 +176,7 @@ class Command<
     enableVersion,
     ...options
   }: {
-    description: string;
+    description?: string;
     name?: string;
     version?: string;
     enableHelp?: true;
@@ -184,7 +184,7 @@ class Command<
     allowOptionAfterPositional?: boolean;
     allowDuplicateOptions?: boolean;
     allowSingleDashAsPositional?: boolean;
-  }) {
+  } = {}) {
     const base = new Command<0, [], {}, {}, never>(
       description,
       0,
@@ -938,7 +938,7 @@ class CommandGroup<
   const Result
 > {
   private constructor(
-    private readonly description: string,
+    private readonly description: string | undefined,
     private readonly commands: Partial<
       Record<string, CommandRegistration<InnerContext, Result>>
     >,
@@ -958,15 +958,15 @@ class CommandGroup<
     }
   ) {}
 
-  public static commandGroup<InnerContext, T = never>(options: {
-    description: string;
+  public static commandGroup<InnerContext, T = never>(options?: {
+    description?: string;
     name?: string;
     version?: string;
     allowDuplicateOptions?: boolean;
     allowSingleDashAsPositional?: boolean;
   }): CommandGroup<{}, {}, {}, InnerContext, T>;
   public static commandGroup<InnerContext, T = never>(options: {
-    description: string;
+    description?: string;
     name?: string;
     version?: string;
     enableHelp: true;
@@ -980,7 +980,7 @@ class CommandGroup<
     T
   >;
   public static commandGroup<InnerContext, T = never>(options: {
-    description: string;
+    description?: string;
     name?: string;
     version?: string;
     enableVersion: true;
@@ -994,7 +994,7 @@ class CommandGroup<
     T
   >;
   public static commandGroup<InnerContext, T = never>(options: {
-    description: string;
+    description?: string;
     name?: string;
     version?: string;
     enableHelp: true;
@@ -1016,14 +1016,14 @@ class CommandGroup<
     enableVersion,
     ...options
   }: {
-    description: string;
+    description?: string;
     name?: string;
     version?: string;
     enableHelp?: true;
     enableVersion?: true;
     allowDuplicateOptions?: boolean;
     allowSingleDashAsPositional?: boolean;
-  }) {
+  } = {}) {
     const base = new CommandGroup<{}, {}, {}, InnerContext, T>(
       description,
       {},
@@ -1090,7 +1090,7 @@ class CommandGroup<
       },
       this.optionsData,
       this.shortOptions,
-      [...this.helpSubcommands, [name, command.description]],
+      [...this.helpSubcommands, [name, command.description ?? ""]],
       Math.max(this.helpSubcommandsLongestLeftLength, name.length),
       this.helpOptions,
       this.helpOptionsLongestLeftLength,
