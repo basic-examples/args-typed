@@ -22,21 +22,20 @@ Define commands with options, positional arguments, extras, and subcommands—al
 import { command } from "args-typed"; // args parser in pure ts
 import { run } from "args-typed/node"; // nodejs-specific utils
 
-const rm = command({
-  description: "Remove files",
+const cp = command({
+  description: "Copy single file to multiple destinations",
+  enableHelp: true,
 })
-  .extra("files", "Files to remove")
-  .option("h", "help", "Show help")
-  .option("f", "force", "Force remove")
-  .option("r", "recursive", "Remove recursively")
+  .positional("source", "The source file")
+  .extra("destinations", "The destination paths")
+  .option("f", "force", "Force overwrite")
+  .option("r", "recursive", "Copy recursively")
   .option("S", "skip", "Patterns to exclude", "list", parseGlob)
   .build(
     (
-      [...files], // Typed positional arguments
-      { help, force, recursive, skip }, // Typed options
-      { fullName, printDescription } // Context
+      [source, ...destinations], // Typed positional arguments
+      { force, recursive, skip }, // Typed options
     ) => {
-      handleHelp(help, printDescription, fullName);
       // Main logic here
     }
   );
@@ -68,7 +67,7 @@ const rm = command({ description: "Remove files" })
   .extra("files", "Files to remove")
   .extra("error", "extra cannot be used multiple times")
   // type error occurs here
-  .option("h", "help", "Show help")
+  .option("o", "option", "Some option")
 ```
 
 #### Positional Arguments
