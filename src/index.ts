@@ -1052,16 +1052,6 @@ class CommandGroup<
     }
   }
 
-  public command<const Name extends string, T2>(
-    name: Name,
-    command: CommandRegistration<InnerContext, T2>
-  ): CommandGroup<
-    Commands & Record<Name, never>,
-    LongOptions,
-    ShortOptions,
-    InnerContext,
-    Result | T2
-  >;
   public command<const Name extends string>(
     name: Name,
     command: CommandRegistration<InnerContext, Result>
@@ -1071,6 +1061,16 @@ class CommandGroup<
     ShortOptions,
     InnerContext,
     Result
+  >;
+  public command<const Name extends string, T2>(
+    name: Name,
+    command: CommandRegistration<InnerContext, T2>
+  ): CommandGroup<
+    Commands & Record<Name, never>,
+    LongOptions,
+    ShortOptions,
+    InnerContext,
+    Result | T2
   >;
   public command<const Name extends string, T2>(
     name: Name,
